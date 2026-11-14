@@ -1,0 +1,39 @@
+@import "tailwindcss" source(none);
+
+:root {
+  color-scheme: light;
+  background: #faf9f6;
+  color: #263d37;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid #648772; outline-offset: 6px; }
+.shell { max-width: 1000px; margin: auto; padding: 0 28px; }
+.site-header { padding: 32px 0; }
+h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.04em; }
+main { min-height: calc(100svh - 95px); display: grid; align-items: center; padding: 24px 0 100px; }
+.capture { width: 100%; max-width: 760px; margin: auto; }
+.capture-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.capture-button { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 28px; min-height: 290px; padding: 32px 20px; border-radius: 20px; font-size: 25px; font-weight: 600; transition: background .15s; }
+.capture-button svg { width: 56px; height: 56px; }
+.camera-button { background: #315b48; color: white; border: 1px solid #315b48; }
+.camera-button:hover { background: #244637; }
+.upload-button { background: #fff; color: #315b48; border: 1px solid #cbd5cb; }
+.upload-button:hover { background: #edf1e8; }
+.error { margin: 20px 0 0; color: #9b302b; text-align: center; font-size: 15px; }
+.photo-preview { position: relative; margin-top: 24px; border-radius: 16px; overflow: hidden; background: #eaf0e7; }
+.photo-preview img { display: block; width: 100%; max-height: 440px; object-fit: contain; }
+.remove-photo { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #cbd5cb; border-radius: 50%; background: white; color: #263d37; }
+.remove-photo:hover { background: #edf1e8; }
+.remove-photo svg { width: 20px; height: 20px; }
+@media (max-width: 600px) {
+  .shell { padding: 0 22px; }
+  .site-header { padding: 24px 0; }
+  main { min-height: calc(100svh - 79px); padding-bottom: 48px; }
+  .capture-actions { grid-template-columns: 1fr; gap: 18px; }
+  .capture-button { min-height: 210px; font-size: 24px; gap: 22px; }
+  .capture-button svg { width: 48px; height: 48px; }
+}
