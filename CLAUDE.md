@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Read [docs/UI_SPEC.md](docs/UI_SPEC.md) for the current UI requirements. It supersedes older UI instructions in this file and the planning docs: one native Upload control; no paste-text input, custom camera or confirmation flags; optional Google or email/password login and explicit account creation; minimal copy and the specified cream/navy palette. Do not reintroduce a mandatory confirmation workflow or explanatory reader labels from earlier plans.
+Read [docs/UI_SPEC.md](docs/UI_SPEC.md) for the current UI requirements. It supersedes older UI instructions in this file and the planning docs: one native Upload control; no paste-text input, custom camera or confirmation flags; optional Google or email/password login with automatic email routing and a signup Name field; minimal copy and the specified cream/navy palette. Do not reintroduce a mandatory confirmation workflow or explanatory reader labels from earlier plans.
 
 The UI is implemented in `components/sid-app.tsx` with modular reader/settings/history/dialog components. Sample previews are explicit URL states documented in README and must never masquerade as real scan output or account authentication. OCR/AI processing is not connected. Keep backend-dependent actions honest about unavailable services.
 
@@ -9,14 +9,14 @@ The backend notes below are earlier planning guidance. Reconcile them with the c
 ## Shape of the app
 
 - One Next.js app on Vercel. Browser operations use Supabase RLS and narrowly scoped RPCs for auth, uploads, history, flag review and deletion.
-- `/api/process` holds AI credentials. `/api/history/import` is the only additional privileged application route, for optional guest-history imports after login; it may use the service-role key but never AI credentials. Both initial processing and Retry call `/api/process` with `{ documentId }` and a bearer token. Never send image bytes or a Storage path in that request.
+- `/api/process` holds AI credentials. `/api/auth/email-status` is a privileged, rate-limited yes/no email lookup; it may read `SUPABASE_SECRET_KEY` (or legacy service-role key) but never expose it. `/api/history/import` is another planned privileged application route, for optional guest-history imports after login; it may use the service-role key but never AI credentials. Both initial processing and Retry call `/api/process` with `{ documentId }` and a bearer token. Never send image bytes or a Storage path in that request.
 - Upload images directly to private Storage, then insert a `queued` document. Pasted input goes into immutable `input_text`. Ready documents are reopened without reprocessing.
 
 - Guest mode is core: open Scan immediately, create/reuse an anonymous session behind the scenes, and never gate scanning or reading on Google/email login. "Save my history" offers account creation or existing-account login; preserve guest scans through the documented upgrade/import flow.
 
 ## Hard rules
 
-1. **No secrets in the browser.** Gemini and Vision credentials are read only inside `app/api/process`; the service-role key is allowed there and in `app/api/history/import` only. Never use a `NEXT_PUBLIC_` prefix for them or import server-only modules into client components.
+1. **No secrets in the browser.** Gemini and Vision credentials are read only inside `app/api/process`; private Supabase server keys are allowed there, in `app/api/history/import`, and in `app/api/auth/email-status` only. Never use a `NEXT_PUBLIC_` prefix for them or import server-only modules into client components.
 2. **RLS and restricted writes from the start.** Every new table gets RLS and explicit permissions in its migration. Owners must not set processing fields or AI results. Review/removal RPCs only change their documented fields. Usage writes and the atomic claim RPC are service-role-only.
 3. **Verify identity and the whole file key.** Use `supabase.auth.getUser(token)`, filter by document id and verified owner, and derive `{user_id}/{documentId}.jpg`. Validate the stored path equals that exact key before any privileged download/deletion. An owned row does not make its path trustworthy.
 4. **No document content in logs.** Log ids, timings and short error codes only. Never log text, prompts, model responses, signed URLs or raw upstream errors.

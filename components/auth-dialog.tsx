@@ -22,11 +22,15 @@ export function AuthDialog({
 }) {
   const [step, setStep] = useState<Step>(recovery ? "reset" : "email");
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sentKind, setSentKind] = useState<"signup" | "reset">("signup");
+  const nameRef = useRef<HTMLInputElement>(null);
+  const submitting = useRef(false);
+  const lookupAbort = useRef<AbortController | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const mounted = useRef(false);
@@ -37,11 +41,12 @@ export function AuthDialog({
     return () => {
       mounted.current = false;
       requestId.current += 1;
+      lookupAbort.current?.abort();
     };
   }, []);
   useEffect(() => {
-    if (["login", "signup", "reset"].includes(step))
-      passwordRef.current?.focus();
+    if (step === "signup") nameRef.current?.focus();
+    else if (["login", "reset"].includes(step)) passwordRef.current?.focus();
     else if (step === "forgot") emailRef.current?.focus();
   }, [step]);
 
@@ -54,10 +59,60 @@ export function AuthDialog({
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting.current) return;
     setError("");
     if (step === "email") {
-      setEmail(email.trim());
-      changeStep("login");
+      const normalizedEmail = email.trim().toLowerCase();
+      setEmail(normalizedEmail);
+      if (preview) {
+        changeStep("login");
+        return;
+      }
+      const attempt = ++requestId.current;
+      submitting.current = true;
+      setBusy(true);
+      const controller = new AbortController();
+      lookupAbort.current = controller;
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      try {
+        const result = await fetch("/api/auth/email-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: normalizedEmail }),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const data = await result.json();
+        if (!mounted.current || requestId.current !== attempt) return;
+        if (result.status === 429) {
+          setError("Too many email checks. Please try again shortly.");
+          return;
+        }
+        if (!result.ok || typeof data.exists !== "boolean") {
+          setError("Couldn’t check this email. Please try again later.");
+          return;
+        }
+        setPassword("");
+        setConfirmation("");
+        setStep(data.exists ? "login" : "signup");
+      } catch {
+        if (mounted.current && requestId.current === attempt)
+          setError(
+            navigator.onLine
+              ? "Couldn’t check this email. Please try again later."
+              : "No connection. Try again when you’re online.",
+          );
+      } finally {
+        clearTimeout(timeout);
+        lookupAbort.current = null;
+        submitting.current = false;
+        if (mounted.current && requestId.current === attempt) setBusy(false);
+      }
+      return;
+    }
+    if (step === "signup" && !name.trim()) {
+      setError("Enter your name.");
+      nameRef.current?.focus();
       return;
     }
     if ((step === "signup" || step === "reset") && password !== confirmation) {
@@ -77,6 +132,7 @@ export function AuthDialog({
     }
     const attempt = ++requestId.current;
     const current = () => mounted.current && requestId.current === attempt;
+    submitting.current = true;
     setBusy(true);
     try {
       if (step === "login") {
@@ -94,7 +150,10 @@ export function AuthDialog({
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: { name: name.trim() },
+          },
         });
         if (error) throw error;
         if (!current()) return;
@@ -127,10 +186,12 @@ export function AuthDialog({
     } catch (error) {
       if (current()) setError(authErrorMessage(error));
     } finally {
+      submitting.current = false;
       if (current()) setBusy(false);
     }
   }
   async function google() {
+    if (submitting.current) return;
     setError("");
     if (preview) {
       setError(
@@ -144,6 +205,7 @@ export function AuthDialog({
       return;
     }
     const attempt = ++requestId.current;
+    submitting.current = true;
     setBusy(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -153,6 +215,7 @@ export function AuthDialog({
       if (error) throw error;
     } catch (error) {
       if (mounted.current && requestId.current === attempt) {
+        submitting.current = false;
         setError(authErrorMessage(error));
         setBusy(false);
       }
@@ -205,7 +268,7 @@ export function AuthDialog({
               disabled={busy}
             />
             <button className="button" type="submit" disabled={busy}>
-              Continue with email
+              {busy ? "Checking" : "Continue with email"}
             </button>
           </form>
         </>
@@ -261,6 +324,26 @@ export function AuthDialog({
               </>
             ) : (
               <>
+                {step === "signup" && (
+                  <>
+                    <label className="sr-only" htmlFor="auth-name">
+                      Name
+                    </label>
+                    <input
+                      ref={nameRef}
+                      id="auth-name"
+                      name="name"
+                      type="text"
+                      placeholder="Name"
+                      autoComplete="name"
+                      maxLength={100}
+                      required
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      disabled={busy}
+                    />
+                  </>
+                )}
                 <input
                   name="email"
                   type="email"

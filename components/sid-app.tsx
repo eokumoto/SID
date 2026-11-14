@@ -81,6 +81,10 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const [deleteError, setDeleteError] = useState("");
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const settings = useReaderSettings();
+  const metadataName =
+    user?.user_metadata?.name ?? user?.user_metadata?.full_name;
+  const displayName =
+    typeof metadataName === "string" ? metadataName.trim() : "";
   const signedIn = !!user || previewAccount;
   const stopWork = () => {
     timers.current.forEach(clearTimeout);
@@ -515,7 +519,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
                 aria-expanded={accountMenu}
                 onClick={() => setAccountMenu(!accountMenu)}
               >
-                {(user?.email?.[0] ?? "S").toUpperCase()}
+                {(displayName[0] ?? user?.email?.[0] ?? "S").toUpperCase()}
               </button>
               {accountMenu && (
                 <div className="account-menu">

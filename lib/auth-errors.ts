@@ -24,7 +24,7 @@ export function authErrorMessage(error: unknown): string {
     case "email_address_not_authorized":
       return "Email delivery isn’t configured for this address yet.";
     case "over_email_send_rate_limit":
-      return "Too many emails requested. Try again later.";
+      return "This app’s email-sending limit was reached. Please try again later.";
     case "over_request_rate_limit":
       return "Too many attempts. Try again later.";
     case "provider_disabled":

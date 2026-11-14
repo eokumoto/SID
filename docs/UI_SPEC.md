@@ -78,7 +78,7 @@ Open them in a browser. Copy colors, spacing and layout from them. Do not copy t
    - Title "Log in or sign up".
    - `[G] Continue with Google` (outlined button).
    - Divider line with "or".
-   - Email field, then blue `Continue with email` button. Updated requirement: continue to a password step. Existing users choose Log in; new users choose Create account, enter a password and confirm it. Supabase has no public email-existence lookup, so do not infer account existence from an invalid-password response. Signup may require email confirmation according to the project settings. Include Forgot password and handle valid reset links. Google login stays available.
+   - Email field, then blue `Continue with email` button. Updated requirement: continue to a password step. After email entry, a rate-limited server-side lookup automatically selects Log in for an existing account or Create account for a new email. Signup asks for Name, password and confirmation. Never infer account existence from an invalid-password response; this requires the private server key and lookup migration. Signup may require email confirmation according to the project settings. Include Forgot password and handle valid reset links. Google login stays available.
    - After login, the current scan and all later scans save to History. Closing the box keeps the current reading on screen, unsaved.
 8. **History (logged in only).** Centered list of outlined cards, newest first: thumbnail, first line of text (truncated), date in muted text.
    - Desktop: trash icon on hover. Phone: swipe left reveals a brick Delete area with a trash icon.
