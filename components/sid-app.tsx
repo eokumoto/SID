@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties, FormEvent } from "react";
+import type { CSSProperties } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
 import {
@@ -17,6 +17,8 @@ import { Dialog } from "./ui/dialog";
 import { SettingsPanel } from "./settings-panel";
 import { ReaderView } from "./reader-view";
 import { HistoryList } from "./history-list";
+import { AuthDialog } from "./auth-dialog";
+import { authErrorMessage } from "@/lib/auth-errors";
 
 type Screen = "home" | "processing" | "reader" | "history" | "error";
 const previewScreens: Record<string, Screen> = {
@@ -77,11 +79,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   );
   const [deletingBusy, setDeletingBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  const [email, setEmail] = useState("");
-  const [authStatus, setAuthStatus] = useState<
-    "idle" | "busy" | "sent" | "error"
-  >("idle");
-  const [authError, setAuthError] = useState("");
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const settings = useReaderSettings();
   const signedIn = !!user || previewAccount;
   const stopWork = () => {
@@ -133,7 +131,8 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     }
     supabase.auth
       .getSession()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) setNotice(authErrorMessage(error));
         receiveUser(
           data.session?.user && !data.session.user.is_anonymous
             ? data.session.user
@@ -145,10 +144,14 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       });
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       receiveUser(
         session?.user && !session.user.is_anonymous ? session.user : null,
       );
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecovery(true);
+        setModal("login");
+      }
     });
     return () => {
       active = false;
@@ -343,41 +346,6 @@ export function SidApp({ preview = "" }: { preview?: string }) {
         .catch(() => setNotice("Settings not synced"));
     }
   }
-  async function signIn(provider: "google" | "email", event?: FormEvent) {
-    event?.preventDefault();
-    setAuthStatus("busy");
-    setAuthError("");
-    if (isPreview) {
-      setAuthStatus("error");
-      setAuthError("Not connected");
-      return;
-    }
-    const supabase = getSupabase();
-    if (!supabase) {
-      setAuthStatus("error");
-      setAuthError("Not connected");
-      return;
-    }
-    try {
-      if (provider === "google") {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: { redirectTo: window.location.origin },
-        });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (error) throw error;
-        setAuthStatus("sent");
-      }
-    } catch {
-      setAuthStatus("error");
-      setAuthError(navigator.onLine ? "Try again" : "No connection");
-    }
-  }
   async function signOut() {
     if (user) {
       const { error } = await getSupabase()!.auth.signOut();
@@ -567,7 +535,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
               className="button login-trigger"
               onClick={() => {
                 setModal("login");
-                setAuthStatus("idle");
+                setPasswordRecovery(false);
               }}
             >
               Log in
@@ -698,62 +666,20 @@ export function SidApp({ preview = "" }: { preview?: string }) {
         />
       )}
       {modal === "login" && (
-        <Dialog
-          label="Log in or sign up"
-          className="login-dialog"
-          onClose={() => setModal(null)}
-        >
-          <h2>Log in or sign up</h2>
-          <button
-            type="button"
-            className="button outlined google-button"
-            disabled={authStatus === "busy"}
-            onClick={() => void signIn("google")}
-          >
-            <span className="google-g" aria-hidden="true">
-              G
-            </span>
-            Continue with Google
-          </button>
-          <div className="or-divider">
-            <span>or</span>
-          </div>
-          <form onSubmit={(event) => void signIn("email", event)}>
-            <label className="sr-only" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="Email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              disabled={authStatus === "busy"}
-            />
-            <button
-              className="button"
-              type="submit"
-              disabled={authStatus === "busy"}
-            >
-              {authStatus === "busy" ? "Connecting" : "Continue with email"}
-            </button>
-          </form>
-          {authStatus === "sent" && (
-            <p className="auth-feedback" role="status">
-              <Icon name="mail" />
-              Check email
-            </p>
-          )}
-          {authStatus === "error" && (
-            <p className="auth-feedback error-message" role="alert">
-              <Icon name="offline" />
-              {authError}
-            </p>
-          )}
-        </Dialog>
+        <AuthDialog
+          key={passwordRecovery ? "recovery" : "login"}
+          preview={isPreview}
+          recovery={passwordRecovery}
+          onClose={() => {
+            setModal(null);
+            setPasswordRecovery(false);
+          }}
+          onSuccess={(message) => {
+            setModal(null);
+            setPasswordRecovery(false);
+            if (message) setNotice(message);
+          }}
+        />
       )}
       {deleting && (
         <Dialog

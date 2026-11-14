@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Read [docs/UI_SPEC.md](docs/UI_SPEC.md) for the current UI requirements. It supersedes older UI instructions in this file and the planning docs: one native Upload control; no paste-text input, custom camera or confirmation flags; optional Google/email magic-link login; minimal copy and the specified cream/navy palette. Do not reintroduce a mandatory confirmation workflow or explanatory reader labels from earlier plans.
+Read [docs/UI_SPEC.md](docs/UI_SPEC.md) for the current UI requirements. It supersedes older UI instructions in this file and the planning docs: one native Upload control; no paste-text input, custom camera or confirmation flags; optional Google or email/password login and explicit account creation; minimal copy and the specified cream/navy palette. Do not reintroduce a mandatory confirmation workflow or explanatory reader labels from earlier plans.
 
 The UI is implemented in `components/sid-app.tsx` with modular reader/settings/history/dialog components. Sample previews are explicit URL states documented in README and must never masquerade as real scan output or account authentication. OCR/AI processing is not connected. Keep backend-dependent actions honest about unavailable services.
 
