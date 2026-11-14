@@ -41,6 +41,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     : "home";
   const isPreview = Object.hasOwn(previewScreens, preview);
   const [screen, setScreen] = useState<Screen>(initial);
+  const [homeReturn, setHomeReturn] = useState(false);
   const [modal, setModal] = useState<"settings" | "login" | null>(
     preview === "settings" ? "settings" : preview === "login" ? "login" : null,
   );
@@ -100,6 +101,14 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     setModal(null);
     setAccountMenu(false);
     setDragging(false);
+  };
+  const returnHome = () => {
+    home();
+    setHomeReturn(false);
+    requestAnimationFrame(() => {
+      setHomeReturn(true);
+      window.setTimeout(() => setHomeReturn(false), 360);
+    });
   };
 
   useEffect(
@@ -547,8 +556,8 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const background = {
     cream: "#FBF4E4",
     peach: "#F3E3CC",
-    yellow: "#F6E9A8",
     dark: "#22232B",
+    navy: "#1F2A44",
   }[settings.background];
   const style = {
     fontFamily:
@@ -588,7 +597,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   } as CSSProperties;
   return (
     <div
-      className={`sid-app ${settings.background === "dark" ? "theme-dark" : ""}`}
+      className={`sid-app ${settings.background === "dark" ? "theme-dark" : ""} ${settings.background === "navy" ? "theme-navy" : ""} ${settings.background === "peach" ? "theme-peach" : ""} ${settings.reduceMotion ? "reduce-motion" : ""}`}
       style={style}
     >
       <a className="skip-link" href="#main">
@@ -599,7 +608,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           type="button"
           className="wordmark"
           aria-label="SID home"
-          onClick={home}
+          onClick={returnHome}
         >
           <span className="brand-icon" aria-hidden="true">
             <Icon name="document" />
@@ -693,7 +702,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           event.target.value = "";
         }}
       />
-      <main id="main" tabIndex={-1}>
+      <main id="main" tabIndex={-1} className={homeReturn ? "home-return" : ""}>
         {screen === "home" && (
           <section className="center-stage home-screen" aria-label="Upload">
             <button

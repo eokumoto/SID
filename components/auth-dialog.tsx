@@ -233,6 +233,7 @@ export function AuthDialog({
     <Dialog
       label="Log in or sign up"
       className="login-dialog"
+      animateClose
       onClose={onClose}
     >
       <h2>{title}</h2>
