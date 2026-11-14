@@ -474,7 +474,15 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           aria-label="SID home"
           onClick={home}
         >
-          SID
+          <span className="brand-icon" aria-hidden="true">
+            <Icon name="document" />
+          </span>
+          <span className="brand-copy">
+            <span className="brand-name">SID</span>
+            <span className="brand-subtitle">
+              Simplified Information Display
+            </span>
+          </span>
         </button>
         <nav aria-label="Main navigation">
           {signedIn && (
@@ -564,11 +572,16 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             <button
               type="button"
               className="button upload-button"
+              aria-describedby="upload-description"
               onClick={() => picker.current?.click()}
             >
               <Icon name="upload" />
               Upload
             </button>
+            <p id="upload-description" className="upload-description">
+              Upload a photo. We’ll show the words in a clear font with more
+              space.
+            </p>
           </section>
         )}
         {screen === "processing" && (

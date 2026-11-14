@@ -43,7 +43,7 @@ Open them in a browser. Copy colors, spacing and layout from them. Do not copy t
 
 ## Navbar (every screen)
 
-- Left: "SID" wordmark (cream text on blue block). Clicking it goes Home.
+- Left: a document placeholder icon on a peach tile, with "SID" and "Simplified Information Display" underneath. Clicking the branding goes Home.
 - Right, logged out: `[gear] Settings` and a blue `Log in` button.
 - Right, logged in: `[clock] History`, `[gear] Settings`, and the account avatar.
 - 1px ink line under the bar. The current page's item has a 2px blue underline.
@@ -51,7 +51,7 @@ Open them in a browser. Copy colors, spacing and layout from them. Do not copy t
 
 ## Screens
 
-1. **Home.** Only a large blue `[upload icon] Upload` button in the center. It is a normal `<input type="file" accept="image/*">`.
+1. **Home.** A large blue `[upload icon] Upload` button in the center, with the requested line underneath: "Upload a photo. We’ll show the words in a clear font with more space." It is a normal `<input type="file" accept="image/*">`.
    - Phone: tapping it opens the phone's own menu (Photo Library / Take Photo / Choose File). Do not build a camera screen.
    - Desktop: opens the file picker. Also support drag-and-drop anywhere on the page and pasting an image with Ctrl/Cmd+V.
 2. **Home, dragging a file (desktop).** The whole window shows a dashed blue border with an upload icon and the word "Drop".

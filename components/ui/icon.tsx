@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 
 export type IconName =
   | "upload"
+  | "document"
   | "settings"
   | "history"
   | "photo"
@@ -19,6 +20,11 @@ export type IconName =
   | "logout"
   | "mail";
 const paths: Record<IconName, React.ReactNode> = {
+  document: (
+    <>
+      <path d="M5 3h10l4 4v14H5zM15 3v4h4M8 10h7M8 14h5M8 18h7" />
+    </>
+  ),
   upload: (
     <>
       <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />
