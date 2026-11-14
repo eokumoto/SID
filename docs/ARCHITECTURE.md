@@ -1,5 +1,7 @@
 # Architecture
 
+**Current UI:** [UI_SPEC.md](UI_SPEC.md) supersedes the input/review/auth presentation described in this earlier architecture plan. The implemented UI has one native Upload button, no paste-text input or confirmation flags, and optional Google/email magic-link login. See README for working integrations, sample preview routes and the unconnected OCR/processing boundary. The remaining backend design needs reconciliation before implementation.
+
 One Next.js app on Vercel, one Supabase project, one deployment. The browser uses Supabase for auth and owner-scoped data operations; `/api/process` performs AI work and a separate `/api/history/import` route handles optional guest-history imports. These docs describe the target build. The repo currently contains a runnable frontend prototype and the initial Supabase schema. The current home page is photo-only: SID plus two large actions, Take picture and Upload file. It previews the selected image locally; no upload, OCR, AI, auth, history, paste-text input or reader controls are connected. Earlier text-input flows below are superseded by this photo-only UI direction.
 
 ## Layers

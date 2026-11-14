@@ -1,6 +1,10 @@
 # CLAUDE.md
 
-Guidance for AI coding tools working in this repo. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before structural changes. The current UI direction is photo-only with minimal visible copy: SID, Take picture, Upload file, then a local preview. No paste-text input or homepage reader controls. Earlier text-input specifications describe a superseded proposal. A minimal frontend prototype exists (camera/file pickers and photo preview); it has no backend, auth or persistence. Docs describe the target implementation; [DATA_MODEL.md](docs/DATA_MODEL.md#required-follow-up-migrations) identifies the migrations missing from the initial schema.
+Read [docs/UI_SPEC.md](docs/UI_SPEC.md) for the current UI requirements. It supersedes older UI instructions in this file and the planning docs: one native Upload control; no paste-text input, custom camera or confirmation flags; optional Google/email magic-link login; minimal copy and the specified cream/navy palette. Do not reintroduce a mandatory confirmation workflow or explanatory reader labels from earlier plans.
+
+The UI is implemented in `components/sid-app.tsx` with modular reader/settings/history/dialog components. Sample previews are explicit URL states documented in README and must never masquerade as real scan output or account authentication. OCR/AI processing is not connected. Keep backend-dependent actions honest about unavailable services.
+
+The backend notes below are earlier planning guidance. Reconcile them with the current UI spec before implementing backend features. Preserve secret isolation, owner checks, RLS and conditional processing writes.
 
 ## Shape of the app
 

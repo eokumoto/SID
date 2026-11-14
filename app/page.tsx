@@ -1,14 +1,14 @@
-import { Capture } from "@/components/capture";
+import { SidApp } from "@/components/sid-app";
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ preview?: string }>;
+}) {
+  const params = await searchParams;
   return (
-    <div className="shell">
-      <header className="site-header">
-        <h1>SID</h1>
-      </header>
-      <main>
-        <Capture />
-      </main>
-    </div>
+    <SidApp
+      preview={typeof params.preview === "string" ? params.preview : ""}
+    />
   );
 }
