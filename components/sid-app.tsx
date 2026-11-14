@@ -20,6 +20,7 @@ import { HistoryList } from "./history-list";
 import { AuthDialog } from "./auth-dialog";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { scanStatus } from "@/lib/scan-state";
+import { processingErrorMessage } from "@/lib/scan-errors";
 
 type Screen = "home" | "processing" | "reader" | "history" | "error";
 const previewScreens: Record<string, Screen> = {
@@ -304,14 +305,8 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     }
     if (!body || typeof body !== "object" || !("document" in body)) {
       const code = body && typeof body === "object" && "error" in body ? (body as { error?: unknown }).error : "";
-      if (code === "invalid_input") throw new Error("Image unreadable");
-      if (code === "timeout") throw new Error("Timed out");
-      if (code === "daily_limit") throw new Error("Daily limit reached");
-      if (code === "service_unavailable") throw new Error("Not connected");
-      if (code === "already_processing") throw new Error("Still processing. Try again shortly");
-      if (code === "attempt_superseded") throw new Error("Scan changed. Try again");
-      if (code === "original_unavailable") throw new Error("Original unavailable");
-      throw new Error("Couldn’t read this photo");
+      const reason = body && typeof body === "object" && "reason" in body ? body.reason : undefined;
+      throw new Error(processingErrorMessage(code, reason));
     }
     const scan = resultToScan((body as { document: Parameters<typeof resultToScan>[0] }).document, photoUrl);
     timers.current.forEach(clearTimeout);

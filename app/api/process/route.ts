@@ -115,9 +115,13 @@ function validResult(value: unknown): value is GeminiResult {
     v.key_terms.every((term) => typeof term === "string" && term.length <= 1000);
 }
 
+class GeminiFailure extends Error {
+  constructor(readonly reason: string) { super("gemini_failed"); }
+}
+
 async function geminiAttempt(bytes: Buffer, mimeType: string, signal: AbortSignal) {
   const apiKey = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const model = (process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite").replace(/^models\//, "");
   if (!apiKey) throw new Error("gemini_not_configured");
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
@@ -140,8 +144,24 @@ async function geminiAttempt(bytes: Buffer, mimeType: string, signal: AbortSigna
     }),
   });
   const body: unknown = await response.json().catch(() => null);
-  const text = body && typeof body === "object" ? (body as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> }).candidates?.[0]?.content?.parts?.[0]?.text : null;
-  if (!response.ok || typeof text !== "string") throw new Error("gemini_failed");
+  if (!response.ok) {
+    const details = body && typeof body === "object" ? (body as { error?: { details?: Array<{ reason?: string }> } }).error?.details : null;
+    const invalidKey = Array.isArray(details) && details.some((detail) => detail?.reason === "API_KEY_INVALID" || detail?.reason === "API_KEY_EXPIRED");
+    const reason = invalidKey || response.status === 401 || response.status === 403 ? "ai_auth_failed"
+      : response.status === 429 ? "ai_rate_limited"
+      : response.status === 404 ? "ai_model_unavailable"
+      : response.status === 400 ? "ai_request_rejected" : "ai_unavailable";
+    throw new GeminiFailure(reason);
+  }
+  const output = body && typeof body === "object" ? body as {
+    promptFeedback?: { blockReason?: unknown };
+    candidates?: Array<{ finishReason?: string; content?: { parts?: Array<{ text?: unknown; thought?: boolean }> } }>;
+  } : null;
+  const candidate = output?.candidates?.[0];
+  if (output?.promptFeedback?.blockReason || ["SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY"].includes(candidate?.finishReason ?? "")) throw new GeminiFailure("ai_response_blocked");
+  if (candidate?.finishReason === "MAX_TOKENS") throw new GeminiFailure("ai_output_incomplete");
+  const text = candidate?.content?.parts?.filter((part) => !part.thought && typeof part.text === "string").map((part) => part.text).join("");
+  if (!text) throw new GeminiFailure("ai_empty_response");
   let result: unknown;
   try { result = JSON.parse(text); } catch { throw new Error("bad_ai_json"); }
   if (!validResult(result)) throw new Error("bad_ai_json");
@@ -205,7 +225,8 @@ async function processRequest(request: Request, deadline: AbortSignal) {
   if (claim.document?.status === "ready") return json({ document: claim.document });
   const attemptId = claim.document?.attempt_id;
   if (!attemptId) return json({ error: "unknown" }, 500);
-  const fail = async (error: string, status: number) => {
+  const fail = async (error: string, status: number, reason?: string) => {
+    console.warn("scan_processing_failed", { documentId, error, ...(reason ? { reason } : {}) });
     try {
       const cleanup = createClient(url, serviceKey, {
         auth: { persistSession: false, autoRefreshToken: false },
@@ -213,7 +234,7 @@ async function processRequest(request: Request, deadline: AbortSignal) {
       });
       await cleanup.from("documents").update({ status: "failed", error }).eq("id", documentId).eq("user_id", userId).eq("status", "processing").eq("attempt_id", attemptId);
     } catch { /* Stale claims can be recovered after two minutes. */ }
-    return json({ error }, status);
+    return json({ error, ...(reason ? { reason } : {}) }, status);
   };
   try {
     const { data: file, error: downloadError } = await supabase.storage.from("scans").download(expectedPath);
@@ -243,6 +264,6 @@ async function processRequest(request: Request, deadline: AbortSignal) {
     return json({ document: saved });
   } catch (error) {
     const code = deadline.aborted ? "timeout" : error instanceof Error && error.message === "bad_ai_json" ? "bad_ai_json" : "ai_failed";
-    return fail(code, code === "timeout" ? 504 : 502);
+    return fail(code, code === "timeout" ? 504 : 502, error instanceof GeminiFailure ? error.reason : undefined);
   }
 }
