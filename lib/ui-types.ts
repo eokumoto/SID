@@ -22,4 +22,5 @@ export type Scan = {
   imagePath?: string;
   sample?: boolean;
   warnings?: string[];
+  textRegions?: import("./transcription").TextRegion[];
 };

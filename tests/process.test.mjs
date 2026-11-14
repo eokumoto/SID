@@ -13,6 +13,7 @@ function load(file, overrides = {}, globals = {}) {
   return tsModule.exports;
 }
 const accuracy = load('lib/accuracy.ts');
+const transcription = load('lib/transcription.ts');
 const { scanStatus } = load('lib/scan-state.ts');
 const { processingErrorMessage } = load('lib/scan-errors.ts');
 const id = '12345678-1234-4234-8234-123456789abc';
@@ -38,6 +39,7 @@ function fixture(options = {}) {
         eq: (key, val) => { filters.push([key, val]); return query; },
         update: (data) => { value = data; writes.push({ data, filters }); return query; },
         maybeSingle: async () => {
+          if (value && Object.hasOwn(value, 'text_regions') && options.layoutMigrationMissing) return { data: null, error: { code: 'PGRST204' } };
           if (value) return { data: options.superseded ? null : { ...doc, ...value } };
           reads.push(filters);
           return { data: doc };
@@ -51,6 +53,7 @@ function fixture(options = {}) {
   const route = load('app/api/process/route.ts', {
     '@supabase/supabase-js': { createClient: () => client },
     '../../../lib/accuracy': accuracy,
+    '../../../lib/transcription': transcription,
   }, {
     process: { env },
     console: { warn: (...args) => logs.push(args) },
@@ -108,6 +111,48 @@ test('default model uses the current documented replacement for restricted 2.5 F
   const f = fixture();
   assert.equal((await f.run()).status, 200);
   assert.equal(f.providerUrls[0], 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent');
+});
+test('transcription is authoritative even if a model returns a paraphrase in the legacy field', async () => {
+  const source = '21. Suppose you’re asked to determine the curve.\nF is conservative.\n\nDo not simplify.';
+  const regions = [{ text: 'F is conservative.', box_2d: [100, 50, 150, 800] }];
+  const f = fixture({ outputs: [JSON.stringify({ ...result, source_text: source, plain_text: 'Here is a simpler explanation.', text_regions: regions })] });
+  const document = (await (await f.run()).json()).document;
+  assert.equal(document.ocr_text, source);
+  assert.equal(document.plain_text, source);
+  assert.deepEqual(document.text_regions, regions);
+});
+test('malformed optional geometry does not fail transcription', async () => {
+  const f = fixture({ outputs: [JSON.stringify({ ...result, text_regions: [{ text: 'Hallucinated text', box_2d: [-1, 0, 5, 5] }] })] });
+  const response = await f.run();
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).document.text_regions, []);
+});
+test('missing optional layout migration does not break an otherwise working scan', async () => {
+  const f = fixture({ layoutMigrationMissing: true });
+  assert.equal((await f.run()).status, 200);
+  assert.equal(f.writes.length, 2);
+  assert.equal(Object.hasOwn(f.writes[1].data, 'text_regions'), false);
+  assert.equal(f.writes[1].data.plain_text, result.source_text);
+});
+test('older saved scans display original OCR rather than their saved rewrite', () => {
+  const source = '  EXACT punctuation: −3, 500 mg.\n\nSecond paragraph.\n';
+  assert.equal(transcription.originalText({ ocr_text: source, plain_text: 'Simplified.' }), source);
+  assert.equal(transcription.originalText({ gemini_source_text: source, plain_text: 'Simplified.' }), source);
+  assert.equal(transcription.originalText({ plain_text: 'Legacy only' }), 'Legacy only');
+});
+test('overlay validation rejects missing text, out-of-image boxes and reversed coordinates', () => {
+  const valid = { text: 'Room 204 costs $5.', box_2d: [10, 20, 50, 500] };
+  assert.equal(transcription.readTextRegions([valid, { ...valid, text: 'Invented' }, { ...valid, box_2d: [5, 0, 1, 10] }, { ...valid, box_2d: [0, 0, 1001, 1] }], result.source_text).length, 1);
+  assert.equal(transcription.readTextRegions(null, result.source_text).length, 0);
+});
+test('photo fitting preserves image bounds for portrait and landscape photos', () => {
+  const landscape = transcription.fitPhoto({ width: 2000, height: 500 }, { width: 1000, height: 600 });
+  assert.equal(landscape.width, 1000);
+  assert.equal(landscape.height, 250);
+  const portrait = transcription.fitPhoto({ width: 600, height: 800 }, { width: 350, height: 500 });
+  assert.equal(portrait.width, 350);
+  assert.ok(Math.abs(portrait.height - 466.6666667) < 0.001);
+  assert.equal(transcription.fitPhoto({ width: 0, height: 0 }, { width: 1, height: 1 }), null);
 });
 test('configured model names tolerate surrounding whitespace and a models/ prefix', async () => {
   const f = fixture({ env: { GEMINI_MODEL: ' models/gemini-3.8-flash ' } });

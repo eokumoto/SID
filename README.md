@@ -18,7 +18,8 @@ Open [localhost:3000](http://localhost:3000). No credentials are needed to revie
 - Processing, text/photo reader, settings, optional login, history, deletion and error layouts for desktop and mobile.
 - Live font/size/spacing/background settings stored on this device; signed-in accounts also sync `profiles.settings` when Supabase is configured.
 - Read aloud with word-boundary highlighting where supported, section highlighting otherwise. Browser/voice support varies.
-- Zoom/pan in Photo view; the sample flyer also demonstrates a pinned rewritten overlay. Live Vision bounding-box overlays are not implemented.
+- Verbatim OCR in Text view, with the original wording and line breaks. No automatic simplification or summary.
+- Readable text overlays positioned over uploaded photos using Gemini line boxes, plus Original toggle, zoom and pan. Optional Vision remains a separate OCR check, not a requirement for overlays.
 - Optional Google OAuth and email/password login and signup, plus account history reads and deletion through Supabase RLS. Configure both public Supabase variables in `.env.local`, auth providers, and allowed app redirect URLs before using these integrations. Real auth/database behavior needs a configured project to verify.
 
 ## Preview screens
@@ -28,7 +29,7 @@ These routes use clearly labeled sample documents. They do not log in, write acc
 | URL | Screen |
 | --- | --- |
 | `/` | Home |
-| `/?preview=processing` | Reading / Rewriting |
+| `/?preview=processing` | Reading / Formatting |
 | `/?preview=reader` | Text reader |
 | `/?preview=photo` | Photo overlay and zoom |
 | `/?preview=settings` | Settings |
@@ -43,9 +44,9 @@ Settings persist locally, including when reviewing samples. History samples rese
 
 ## Scanning setup
 
-Uploads are stored privately in Supabase Storage, then processed by the server-only `/api/process` route. Gemini reads the image and creates the plain-language rewrite. Google Cloud Vision can optionally perform a second OCR read; when it is unavailable, a successful Gemini scan still completes.
+Uploads are stored privately in Supabase Storage, then processed by the server-only `/api/process` route. Gemini transcribes the image without simplifying, answering, or paraphrasing it and returns normalized text-line positions for Photo view. Google Cloud Vision can optionally perform a second OCR read; when it is unavailable, a successful Gemini scan still completes.
 
-1. Apply all Supabase migrations in order, including `20261114000000_scan_processing.sql` and `20261114010000_processing_claims.sql`. Deploy the new client and route together after the migrations; older clients that insert `status` are deliberately rejected by the restricted input permissions.
+1. Apply all Supabase migrations in order, including `20261114000000_scan_processing.sql`, `20261114010000_processing_claims.sql`, and `20261114020000_transcription_layout.sql`. The last migration saves optional overlay positions in `text_regions`; without it, text scanning still works and the new overlay is available for the current scan, but positions will not survive reloading History. Deploy the new client and route together after the migrations; older clients that insert `status` are deliberately rejected by the restricted input permissions.
 2. In `.env.local` and the deployment environment, set the two public Supabase values, `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`), and `GEMINI_API_KEY`. `GEMINI_MODEL` defaults to the pinned `gemini-3.5-flash-lite`; confirm the configured model is available to your key before the live scan check. Update any existing Vercel override of `gemini-2.5-flash`, which Google now restricts to previous users; see [Google's deprecation notice](https://aistudio.google.com/docs/deprecations#gemini-2.5-flash-models). Redeploy after changing environment variables. `DAILY_LIMIT` defaults to 20 admitted attempts per user per UTC day, including attempts that fail.
 3. Enable anonymous sign-ins in Supabase Auth so a visitor can scan before logging in.
 4. To enable the second OCR pass, enable Cloud Vision API, give a service account Vision access, set `GOOGLE_CLOUD_CREDENTIALS` to its JSON credentials (or a base64-encoded copy), and set `VISION_ENABLED=true`.
@@ -54,9 +55,11 @@ Images are limited to 5 MiB and JPEG, PNG, or WebP. Provider credentials stay on
 
 Processing claims and daily usage are reserved in one database transaction. Active duplicates observe the existing attempt; expired attempts can be retried after two minutes. Completion and failure writes match the attempt id, so old workers cannot overwrite a Retry or recreate a deleted scan. Gemini JSON is validated and retried once on malformed output; optional Vision runs in parallel with its own timeout. Ready rows reopen without provider calls.
 
-Deterministic checks compare protected values, occurrence counts and candidate names and store advisory flags without introducing a confirmation workflow. These conservative checks can flag harmless formatting changes and miss changed relationships, omitted prose or negation; they are not a proof of accuracy. Readers retain the original photo and show a warning when the second read was unavailable.
+The legacy `plain_text` field now stores the same transcription as `ocr_text`; the server does not trust a model's alternate wording. Existing saved scans display their stored OCR in preference to older rewrites, without reprocessing or changing history. Optional second-read comparisons retain advisory uncertainty data. OCR can still misread a photo; verbatim mode means no intentional rewrite, not a guarantee of perfect recognition. The obsolete “Simplified by AI” label is removed.
 
-Local checks use mocked providers and an embedded PostgreSQL engine with minimal Supabase schemas. They do not validate hosted Supabase settings, provider access or image quality. To finish the live milestone, apply the migrations, configure credentials, enable anonymous sign-in, deploy, then upload a public-text photo as a guest and an account. Compare the rewrite with the photo, reopen account history, exercise Retry and confirm the photo/text survive a reload. Guest-to-existing-account history imports remain separate work.
+Photo view places opaque cream boxes with fitted text over the source lines. Image and boxes share the same aspect ratio and zoom/pan transform. Gemini's coordinates are estimates, not pixel-perfect OCR geometry. Invalid geometry is ignored without failing a text scan, and only region text found in the transcription may be overlaid. Existing scans without stored positions show the original photo and can be scanned again for an overlay. The optional second-read warning remains.
+
+Local checks use mocked providers, an embedded PostgreSQL engine with minimal Supabase schemas, and browser tests for photo overlays at desktop/phone sizes. They do not validate hosted Supabase settings, provider access or recognition quality. For the live check, apply the migrations, configure credentials, enable anonymous sign-in, deploy, then upload a public-text photo as a guest and an account. Compare the transcription with the photo, reopen account history, exercise Retry and confirm the photo/text/overlay survive a reload. Guest-to-existing-account history imports remain separate work.
 
 When a scan fails, the reader distinguishes Gemini quota/rate limits, rejected keys/access, unavailable models, rejected requests, blocked/incomplete replies, invalid JSON and failed photo downloads. Provider failures retain `error = 'ai_failed'` in the database; the processing response also supplies a fixed `reason` code. Vercel runtime logs contain `scan_processing_failed` with the document id, error and optional reason, never the photo, document text, key or raw provider response. A quota message can indicate a rate or quota limit; inspect that project's Google AI Studio usage before changing billing or the configured model.
 
@@ -68,12 +71,15 @@ The initial Supabase migration remains unchanged. [DATA_MODEL.md](docs/DATA_MODE
 
 ```sh
 npm test
+npm run test:ui
 npm run lint
 npm run typecheck
 npm run build
 ```
 
 If this execution environment blocks Turbopack's local compiler port, use `npm run build -- --webpack`.
+
+Browser tests use installed Google Chrome by default. Set `PLAYWRIGHT_CHANNEL=msedge` for installed Edge, or install the desired Playwright browser and adjust the channel for your environment. Preview tests never call real providers or write account data.
 
 Keep real credentials in untracked `.env.local` or deployment environment variables. AI/service-role credentials must never enter the browser. This UI only reads `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 

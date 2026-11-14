@@ -614,11 +614,39 @@ button svg {
 }
 .photo-canvas > img {
   display: block;
+  width: 100%;
   height: 100%;
   max-width: 100%;
   object-fit: contain;
   user-select: none;
   pointer-events: none;
+}
+.photo-text-overlays {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.photo-text-region {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  background: var(--cream);
+  color: var(--ink);
+  overflow: visible;
+}
+.photo-text-region > span {
+  display: inline-block;
+  flex: none;
+  font-size: 1px;
+  line-height: 1.3;
+  letter-spacing: 0.025em;
+  word-spacing: 0.08em;
+  white-space: pre;
+  padding: 0 1px;
+}
+.overlay-unavailable {
+  color: var(--muted);
 }
 .sample-overlays {
   position: absolute;
@@ -663,6 +691,12 @@ button svg {
 .original-toggle .icon {
   width: 18px;
   height: 18px;
+}
+.sid-app .segment.original-toggle button {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  flex: 0 0 auto;
 }
 .original-label {
   display: inline-flex;

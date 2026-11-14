@@ -21,6 +21,7 @@ import { AuthDialog } from "./auth-dialog";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { scanStatus } from "@/lib/scan-state";
 import { processingErrorMessage } from "@/lib/scan-errors";
+import { originalText, readTextRegions } from "@/lib/transcription";
 
 type Screen = "home" | "processing" | "reader" | "history" | "error";
 const previewScreens: Record<string, Screen> = {
@@ -208,13 +209,14 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       try {
         const { data, error } = await supabase!
           .from("documents")
-          .select("id,title,image_path,created_at,status,plain_text,warnings,processing_started_at")
+          .select("*")
           .eq("user_id", user!.id)
           .order("created_at", { ascending: false })
           .limit(100);
         if (error) throw error;
         const scans = await Promise.all(
           (data ?? []).map(async (row) => {
+            const text = originalText(row);
             let photoUrl = "";
             const expected = `${user!.id}/${row.id}.jpg`;
             if (row.image_path === expected) {
@@ -225,17 +227,15 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             }
             return {
               id: row.id,
-              title: row.title || row.plain_text?.split("\n")[0] || "Scan",
+              title: row.title || text.split("\n")[0] || "Scan",
               photoUrl,
               createdAt: row.created_at,
               status: scanStatus(row.status, row.processing_started_at),
-              text: row.plain_text ?? "",
-              sections: (row.plain_text ?? "")
-                .split(/\n\s*\n/)
-                .filter(Boolean)
-                .map((text: string) => ({ text })),
+              text,
+              sections: text ? [{ text }] : [],
               imagePath: row.image_path ?? undefined,
               warnings: row.warnings ?? [],
+              textRegions: readTextRegions(row.text_regions, text),
             } satisfies Scan;
           }),
         );
@@ -258,10 +258,10 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   }, [user, isPreview, refresh]);
 
   function resultToScan(
-    row: { id: string; title?: string | null; created_at?: string; status?: string; plain_text?: string | null; image_path?: string | null; warnings?: string[] },
+    row: { id: string; title?: string | null; created_at?: string; status?: string; plain_text?: string | null; ocr_text?: string | null; gemini_source_text?: string | null; image_path?: string | null; warnings?: string[]; text_regions?: unknown },
     photoUrl: string,
   ): Scan {
-    const text = row.plain_text ?? "";
+    const text = originalText(row);
     return {
       id: row.id,
       title: row.title || text.split("\n")[0] || "Scan",
@@ -269,9 +269,10 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       createdAt: row.created_at ?? new Date().toISOString(),
       status: row.status === "ready" ? "ready" : "failed",
       text,
-      sections: text.split(/\n\s*\n/).filter(Boolean).map((section) => ({ text: section })),
+      sections: text ? [{ text }] : [],
       imagePath: row.image_path ?? undefined,
       warnings: row.warnings ?? [],
+      textRegions: readTextRegions(row.text_regions, text),
     };
   }
 
@@ -377,7 +378,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       }
       if (run !== workRun.current) return;
       setProcessingId(documentId);
-      timers.current.push(setTimeout(() => setStage("Rewriting"), 700));
+      timers.current.push(setTimeout(() => setStage("Formatting"), 700));
       await processDocument(documentId, url, run);
     } catch (error) {
       if (run !== workRun.current) return;
@@ -444,7 +445,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   }, []);
   useEffect(() => {
     if (preview !== "processing") return;
-    const timer = setTimeout(() => setStage("Rewriting"), 1500);
+    const timer = setTimeout(() => setStage("Formatting"), 1500);
     return () => clearTimeout(timer);
   }, [preview]);
 
@@ -522,7 +523,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       setScreen("processing");
       setStage("Reading");
       timers.current.push(
-        setTimeout(() => setStage("Rewriting"), 700),
+        setTimeout(() => setStage("Formatting"), 700),
         setTimeout(() => {
           setErrorReason("Too blurry");
           setScreen("error");
@@ -541,7 +542,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     setPhoto(chosen?.photoUrl || photo);
     setScreen("processing");
     setStage("Reading");
-    timers.current.push(setTimeout(() => setStage("Rewriting"), 700));
+    timers.current.push(setTimeout(() => setStage("Formatting"), 700));
     void processDocument(documentId, chosen?.photoUrl || photo, run).catch((error) => {
       if (run !== workRun.current) return;
       setErrorReason(error instanceof Error ? error.message : "Couldn’t read this photo");

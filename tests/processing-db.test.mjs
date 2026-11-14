@@ -22,7 +22,7 @@ test('processing migration enforces claims, quotas, owner isolation and restrict
     create function storage.foldername(text) returns text[] language sql immutable as
       $$ select string_to_array($1, '/') $$;
   `);
-  for (const name of ['20261113000000_init.sql', '20261114000000_scan_processing.sql', '20261114010000_processing_claims.sql']) {
+  for (const name of ['20261113000000_init.sql', '20261114000000_scan_processing.sql', '20261114010000_processing_claims.sql', '20261114020000_transcription_layout.sql']) {
     await db.exec(await readFile(`supabase/migrations/${name}`, 'utf8'));
   }
   const owner = '10000000-0000-4000-8000-000000000001';
@@ -51,6 +51,7 @@ test('processing migration enforces claims, quotas, owner isolation and restrict
     const { rows } = await asOwner('select * from public.documents');
     assert.equal(rows[0].status, 'queued');
     await assert.rejects(asOwner("update public.documents set plain_text = 'forged' where id = $1", [id]), /permission denied/);
+    await assert.rejects(asOwner("update public.documents set text_regions = '[]'::jsonb where id = $1", [id]), /permission denied/);
     await assert.rejects(asOwner("insert into public.documents (id, image_path, status) values ($1, $2, 'ready')", [second, `${owner}/${second}.jpg`]), /permission denied/);
     await assert.rejects(asOwner('insert into public.documents (id, image_path) values ($1, $2)', [second, `${foreign}/${second}.jpg`]), /row-level security/);
     await assert.rejects(asOwner('select public.claim_scan($1, $2, 2)', [id, owner]), /permission denied/);

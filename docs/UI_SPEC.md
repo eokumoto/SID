@@ -1,5 +1,7 @@
 # SID UI spec (for Codex)
 
+Current user update (November 14, 2026): Text view displays verbatim transcription with original wording and line breaks, with no simplification, automatic summary, or “Simplified by AI” label. Processing says Reading / Formatting. Photo view overlays the original transcribed lines in a readable font at their image positions, with a Readable / Original toggle. These requirements supersede rewriting/semantic regrouping instructions below; a future summarize button is deferred.
+
 SID is a web app (Next.js) that helps dyslexic readers: upload a photo of text (menu, flyer, handout) and get it back rewritten in plain language, in a dyslexia-friendly layout. Build the UI exactly as described here. The two wireframe files next to this spec are the visual reference:
 
 - `sid-desktop-wireframes.html` (desktop browser)

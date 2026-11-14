@@ -7,13 +7,16 @@ export const sampleScan: Scan = {
   createdAt: "2026-11-13T12:00:00-08:00",
   status: "ready",
   sample: true,
-  text: "Free flu shots at the Rec Center.\nDay: Sat, Nov 21\nTime: 10 AM to 2 PM.\nBring your student ID.\nCost: Free",
-  sections: [
-    { text: "Free flu shots at the Rec Center." },
-    { label: "Day", text: "Sat, Nov 21" },
-    { label: "Time", text: "10 AM to 2 PM" },
-    { label: "Bring", text: "Your student ID" },
-    { label: "Cost", text: "Free" },
+  text: "FREE FLU SHOTS\nREC CENTER\nSAT, NOV 21\n10 AM – 2 PM\nBring your student ID.\nFREE\nSAMPLE FLYER",
+  sections: [{ text: "FREE FLU SHOTS\nREC CENTER\nSAT, NOV 21\n10 AM – 2 PM\nBring your student ID.\nFREE\nSAMPLE FLYER" }],
+  textRegions: [
+    { text: "FREE FLU SHOTS", box_2d: [172, 180, 225, 820] },
+    { text: "REC CENTER", box_2d: [279, 320, 319, 680] },
+    { text: "SAT, NOV 21", box_2d: [373, 360, 408, 640] },
+    { text: "10 AM – 2 PM", box_2d: [460, 355, 495, 645] },
+    { text: "Bring your student ID.", box_2d: [548, 300, 583, 700] },
+    { text: "FREE", box_2d: [635, 435, 670, 565] },
+    { text: "SAMPLE FLYER", box_2d: [901, 320, 928, 680] },
   ],
 };
 export const sampleHistory: Scan[] = [
@@ -21,6 +24,7 @@ export const sampleHistory: Scan[] = [
   {
     ...sampleScan,
     id: "sample-lunch",
+    textRegions: [],
     title: "Lunch menu: Tuesday specials",
     createdAt: "2026-11-12T12:00:00-08:00",
     text: "Tuesday specials\nSoup: $5\nSandwich: $8\nLunch: 11 AM to 2 PM",
@@ -35,6 +39,7 @@ export const sampleHistory: Scan[] = [
   {
     ...sampleScan,
     id: "sample-lab",
+    textRegions: [],
     title: "Lab safety handout",
     status: "failed",
     text: "",
@@ -45,6 +50,7 @@ export const sampleHistory: Scan[] = [
   {
     ...sampleScan,
     id: "sample-club",
+    textRegions: [],
     title: "Club meeting flyer",
     createdAt: "2026-11-08T12:00:00-08:00",
     text: "Book club\nStudent Center\nFriday, 4 PM\nBring a book.",
