@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Read [docs/UI_SPEC.md](docs/UI_SPEC.md) for the current UI requirements. It supersedes older UI instructions in this file and the planning docs: one native Upload control; no paste-text input, custom camera or confirmation flags; optional Google or email/password login with automatic email routing and a signup Name field; minimal copy and the specified cream/navy palette. Do not reintroduce a mandatory confirmation workflow or explanatory reader labels from earlier plans.
 

@@ -16,6 +16,8 @@ export function ReaderView({
   notify: (message: string) => void;
 }) {
   const [view, setView] = useState<"text" | "photo">(initialView);
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const photoUrl = photoFailed ? "" : scan.photoUrl;
   const speechRun = useRef(0);
   const [speaking, setSpeaking] = useState(false);
   const [active, setActive] = useState<{
@@ -105,7 +107,10 @@ export function ReaderView({
       {view === "text" ? (
         <>
           <div className="reader-split">
-            <article className="reader-panel" aria-label="Rewritten text">
+            <article
+              className="reader-panel"
+              aria-label={scan.sample ? "Rewritten text" : "Extracted text"}
+            >
               <div className="reader-copy">
                 {blocks.map((block, index) => {
                   const full = block.label
@@ -153,9 +158,13 @@ export function ReaderView({
               title="Open photo"
               onClick={() => setView("photo")}
             >
-              {scan.photoUrl ? (
+              {photoUrl ? (
                 <>
-                  <ScanImage src={scan.photoUrl} alt="Original scan" />
+                  <ScanImage
+                    src={photoUrl}
+                    alt="Original scan"
+                    onError={() => setPhotoFailed(true)}
+                  />
                 </>
               ) : (
                 <span className="missing-photo">
@@ -173,11 +182,12 @@ export function ReaderView({
               title="Open photo"
               onClick={() => setView("photo")}
             >
-              {scan.photoUrl ? (
+              {photoUrl ? (
                 <>
                   <ScanImage
-                    src={scan.photoUrl}
+                    src={photoUrl}
                     alt="Original scan thumbnail"
+                    onError={() => setPhotoFailed(true)}
                   />
                 </>
               ) : (
@@ -199,7 +209,7 @@ export function ReaderView({
       ) : (
         <PhotoView
           key={scan.id}
-          url={scan.photoUrl}
+          url={photoUrl}
           sample={scan.id === "sample-flu"}
         />
       )}

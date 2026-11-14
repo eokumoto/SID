@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { User } from "@supabase/supabase-js";
+import { createClient, type User } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
 import {
   saveSettings,
@@ -19,6 +19,14 @@ import { ReaderView } from "./reader-view";
 import { HistoryList } from "./history-list";
 import { AuthDialog } from "./auth-dialog";
 import { authErrorMessage } from "@/lib/auth-errors";
+import {
+  PROCESS_BUCKET,
+  MAX_PHOTO_BYTES,
+  PHOTO_ACCEPT,
+  detectPhotoType,
+  photoExtension,
+  photoMimeType,
+} from "@/lib/scan-upload";
 
 type Screen = "home" | "processing" | "reader" | "history" | "error";
 const previewScreens: Record<string, Screen> = {
@@ -56,6 +64,9 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const dragDepth = useRef(0);
   const picker = useRef<HTMLInputElement>(null);
   const localPhoto = useRef<string | null>(null);
+  const sourceFile = useRef<File | null>(null);
+  const processing = useRef<AbortController | null>(null);
+  const [photoPreviewFailed, setPhotoPreviewFailed] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [errorReason, setErrorReason] = useState(
     preview === "offline" ? "No connection" : "Too blurry",
@@ -87,11 +98,14 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     typeof metadataName === "string" ? metadataName.trim() : "";
   const signedIn = !!user || previewAccount;
   const stopWork = () => {
+    processing.current?.abort();
+    processing.current = null;
     timers.current.forEach(clearTimeout);
     timers.current = [];
   };
   const home = () => {
     stopWork();
+    sourceFile.current = null;
     setScreen("home");
     setModal(null);
     setAccountMenu(false);
@@ -100,6 +114,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
 
   useEffect(
     () => () => {
+      processing.current?.abort();
       timers.current.forEach(clearTimeout);
       if (localPhoto.current) URL.revokeObjectURL(localPhoto.current);
     },
@@ -118,6 +133,9 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     function receiveUser(next: User | null) {
       if (!active) return;
       if (accountId.current && accountId.current !== next?.id) {
+        processing.current?.abort();
+        processing.current = null;
+        sourceFile.current = null;
         timers.current.forEach(clearTimeout);
         timers.current = [];
         setHistory([]);
@@ -131,17 +149,13 @@ export function SidApp({ preview = "" }: { preview?: string }) {
         window.speechSynthesis?.cancel();
       }
       accountId.current = next?.id ?? null;
-      setUser(next);
+      setUser(next && !next.is_anonymous ? next : null);
     }
     supabase.auth
       .getSession()
       .then(({ data, error }) => {
         if (error) setNotice(authErrorMessage(error));
-        receiveUser(
-          data.session?.user && !data.session.user.is_anonymous
-            ? data.session.user
-            : null,
-        );
+        receiveUser(data.session?.user ?? null);
       })
       .catch(() => {
         if (active) setNotice("No connection");
@@ -149,9 +163,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      receiveUser(
-        session?.user && !session.user.is_anonymous ? session.user : null,
-      );
+      receiveUser(session?.user ?? null);
       if (event === "PASSWORD_RECOVERY") {
         setPasswordRecovery(true);
         setModal("login");
@@ -240,17 +252,29 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     };
   }, [user, isPreview, refresh]);
 
-  function showFile(file?: File) {
+  async function showFile(file?: File) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setNotice("Image files only");
+    if (isPreview) {
+      setNotice("Open Home to upload a photo");
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      setNotice("Image too large");
+    const extension = photoExtension(file);
+    if (!extension) {
+      setNotice("Use a JPEG, PNG, WebP, or HEIC photo");
+      return;
+    }
+    if (!file.size || file.size > MAX_PHOTO_BYTES) {
+      setNotice(
+        file.size ? "Photo must be 10 MB or smaller" : "Photo is empty",
+      );
       return;
     }
     stopWork();
+    const controller = new AbortController();
+    processing.current = controller;
+    sourceFile.current = file;
+    const active = () =>
+      processing.current === controller && !controller.signal.aborted;
     setModal(null);
     setAccountMenu(false);
     setDragging(false);
@@ -259,17 +283,140 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     const url = URL.createObjectURL(file);
     localPhoto.current = url;
     setPhoto(url);
+    setPhotoPreviewFailed(false);
     setCurrent(null);
     setScreen("processing");
     setStage("Reading");
-    // UI only: never substitute sample output for a user's photo.
-    // Connect the documented Storage + document-id processing adapter here.
-    timers.current.push(
-      setTimeout(() => {
-        setErrorReason(navigator.onLine ? "Not connected" : "No connection");
+    let uploadedPath: string | null = null;
+    let cleanup: (() => Promise<boolean>) | null = null;
+    try {
+      const mime = photoMimeType(extension)!;
+      const header = new Uint8Array(await file.slice(0, 64).arrayBuffer());
+      if (!active()) return;
+      if (detectPhotoType(header) !== mime) {
+        setNotice("This file is not a supported photo");
+        setErrorReason("Image unreadable");
         setScreen("error");
-      }, 1600),
-    );
+        return;
+      }
+      const supabase = getSupabase();
+      if (!supabase) throw Error("not_connected");
+      const { data: existing, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError) throw Error("session_failed");
+      if (!active()) return;
+      let session = existing.session;
+      if (!session) {
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) {
+          if (error.code === "anonymous_provider_disabled" && active()) {
+            setNotice("Guest scanning unavailable");
+          }
+          throw Error("session_failed");
+        }
+        session = data.session;
+      }
+      if (!active()) return;
+      if (!session) throw Error("session_failed");
+      const accessToken = session.access_token;
+      const owner = session.user.id;
+      const id = crypto.randomUUID();
+      const path = `${owner}/${id}.${extension}`;
+      // Bind uploads and fallback deletion to this session, even if the user
+      // changes accounts while the work is in flight.
+      const clientFor = (signal: AbortSignal) =>
+        createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+              detectSessionInUrl: false,
+            },
+            global: {
+              headers: { Authorization: `Bearer ${accessToken}` },
+              fetch: (input, init) => fetch(input, { ...init, signal }),
+            },
+          },
+        );
+      cleanup = async () => {
+        try {
+          const { error } = await clientFor(AbortSignal.timeout(4000))
+            .storage.from(PROCESS_BUCKET)
+            .remove([path]);
+          return !error;
+        } catch {
+          return false;
+        }
+      };
+      // Include an upload whose response is lost: its object may still exist.
+      uploadedPath = path;
+      const { error: uploadError } = await clientFor(
+        AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]),
+      )
+        .storage.from(PROCESS_BUCKET)
+        .upload(path, file, { contentType: mime, upsert: false });
+      if (uploadError) throw Error("upload_failed");
+      if (!active()) return;
+      const result = await fetch("/api/process", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ path }),
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(40_000),
+        ]),
+      });
+      const body = await result.json();
+      if (!active()) return;
+      if (!result.ok || typeof body.text !== "string" || !body.text.trim()) {
+        setErrorReason(
+          body.error === "blurry"
+            ? "Too blurry"
+            : body.error === "no_text"
+              ? "No text found"
+              : body.error === "timeout"
+                ? "Taking too long"
+                : body.error === "rate_limit"
+                  ? "Try again later"
+                  : "Try again",
+        );
+        if (body.error === "rate_limit")
+          setNotice("You can scan 10 photos every 10 minutes");
+        setScreen("error");
+        return;
+      }
+      const text = body.text.trim();
+      setCurrent({
+        id,
+        title: text.split("\n")[0].slice(0, 120),
+        photoUrl: url,
+        createdAt: new Date().toISOString(),
+        status: "ready",
+        text,
+        sections: text
+          .split(/\n\s*\n/)
+          .filter(Boolean)
+          .map((text: string) => ({ text })),
+      });
+      setScreen("reader");
+    } catch {
+      if (active()) {
+        setErrorReason(navigator.onLine ? "Try again" : "No connection");
+        setScreen("error");
+      }
+    } finally {
+      // The route also deletes in finally. This covers a failed request to the
+      // route, navigation away, or cancellation after Storage accepted a file.
+      if (uploadedPath && cleanup && !(await cleanup()) && active()) {
+        setNotice("Couldn’t confirm photo cleanup. Try again");
+      }
+      if (processing.current === controller) processing.current = null;
+    }
   }
   const showFileRef = useRef(showFile);
   useEffect(() => {
@@ -416,18 +563,11 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       );
       return;
     }
-    if (!photo) {
+    if (scan || !sourceFile.current) {
       picker.current?.click();
       return;
     }
-    setScreen("processing");
-    setStage("Reading");
-    timers.current.push(
-      setTimeout(() => {
-        setErrorReason(navigator.onLine ? "Not connected" : "No connection");
-        setScreen("error");
-      }, 1000),
-    );
+    void showFile(sourceFile.current);
   }
   const background = {
     cream: "#FBF4E4",
@@ -504,6 +644,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
               aria-current={screen === "history" ? "page" : undefined}
               onClick={() => {
                 stopWork();
+                sourceFile.current = null;
                 setScreen("history");
                 setAccountMenu(false);
               }}
@@ -570,7 +711,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       <input
         ref={picker}
         type="file"
-        accept="image/*"
+        accept={PHOTO_ACCEPT}
         hidden
         aria-label="Upload image"
         onChange={(event) => {
@@ -602,15 +743,20 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             aria-label="Processing"
           >
             <div className="scanning-photo">
-              <ScanImage
-                src={photo}
-                alt="Uploaded photo"
-                onError={() => {
-                  setErrorReason("Image unreadable");
-                  setScreen("error");
-                  stopWork();
-                }}
-              />
+              {photoPreviewFailed ? (
+                <span className="missing-photo">
+                  <Icon name="photo" />
+                  Photo preview unavailable
+                </span>
+              ) : (
+                <ScanImage
+                  src={photo}
+                  alt="Uploaded photo"
+                  onError={() => {
+                    setPhotoPreviewFailed(true);
+                  }}
+                />
+              )}
               <div className="scan-beam" aria-hidden="true" />
             </div>
             <p role="status" aria-live="polite">
