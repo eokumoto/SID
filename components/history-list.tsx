@@ -59,6 +59,8 @@ function HistoryRow({
                 <Icon name="blur" />
                 Didn’t work
               </span>
+            ) : scan.status === "queued" || scan.status === "processing" ? (
+              <span><Icon name="history" /> {scan.status === "queued" ? "Queued" : "Reading"}</span>
             ) : (
               <time dateTime={scan.createdAt}>
                 {scan.id === "sample-flu"

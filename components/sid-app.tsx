@@ -19,6 +19,7 @@ import { ReaderView } from "./reader-view";
 import { HistoryList } from "./history-list";
 import { AuthDialog } from "./auth-dialog";
 import { authErrorMessage } from "@/lib/auth-errors";
+import { scanStatus } from "@/lib/scan-state";
 
 type Screen = "home" | "processing" | "reader" | "history" | "error";
 const previewScreens: Record<string, Screen> = {
@@ -58,6 +59,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const picker = useRef<HTMLInputElement>(null);
   const localPhoto = useRef<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const workRun = useRef(0);
   const [errorReason, setErrorReason] = useState(
     preview === "offline" ? "No connection" : "Too blurry",
   );
@@ -88,6 +90,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     typeof metadataName === "string" ? metadataName.trim() : "";
   const signedIn = !!user || previewAccount;
   const stopWork = () => {
+    workRun.current += 1;
     timers.current.forEach(clearTimeout);
     timers.current = [];
   };
@@ -101,6 +104,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
 
   useEffect(
     () => () => {
+      workRun.current += 1;
       timers.current.forEach(clearTimeout);
       if (localPhoto.current) URL.revokeObjectURL(localPhoto.current);
     },
@@ -119,6 +123,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     function receiveUser(next: User | null) {
       if (!active) return;
       if (accountId.current && accountId.current !== next?.id) {
+        workRun.current += 1;
         timers.current.forEach(clearTimeout);
         timers.current = [];
         setHistory([]);
@@ -193,7 +198,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       try {
         const { data, error } = await supabase!
           .from("documents")
-          .select("id,title,image_path,created_at,status,plain_text")
+          .select("id,title,image_path,created_at,status,plain_text,warnings,processing_started_at")
           .eq("user_id", user!.id)
           .order("created_at", { ascending: false })
           .limit(100);
@@ -213,13 +218,14 @@ export function SidApp({ preview = "" }: { preview?: string }) {
               title: row.title || row.plain_text?.split("\n")[0] || "Scan",
               photoUrl,
               createdAt: row.created_at,
-              status: row.status === "ready" ? "ready" : "failed",
+              status: scanStatus(row.status, row.processing_started_at),
               text: row.plain_text ?? "",
               sections: (row.plain_text ?? "")
                 .split(/\n\s*\n/)
                 .filter(Boolean)
                 .map((text: string) => ({ text })),
               imagePath: row.image_path ?? undefined,
+              warnings: row.warnings ?? [],
             } satisfies Scan;
           }),
         );
@@ -242,7 +248,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   }, [user, isPreview, refresh]);
 
   function resultToScan(
-    row: { id: string; title?: string | null; created_at?: string; status?: string; plain_text?: string | null; image_path?: string | null },
+    row: { id: string; title?: string | null; created_at?: string; status?: string; plain_text?: string | null; image_path?: string | null; warnings?: string[] },
     photoUrl: string,
   ): Scan {
     const text = row.plain_text ?? "";
@@ -255,12 +261,14 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       text,
       sections: text.split(/\n\s*\n/).filter(Boolean).map((section) => ({ text: section })),
       imagePath: row.image_path ?? undefined,
+      warnings: row.warnings ?? [],
     };
   }
 
-  async function processDocument(documentId: string, photoUrl: string) {
+  async function processDocument(documentId: string, photoUrl: string, run: number) {
     const supabase = getSupabase();
-    const { data: sessionData } = await supabase!.auth.getSession();
+    if (!supabase) throw new Error("Not connected");
+    const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
     if (!token) throw new Error("Not connected");
     const response = await fetch("/api/process", {
@@ -268,15 +276,37 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ documentId }),
     });
-    const body: unknown = await response.json().catch(() => null);
-    if (!response.ok || !body || typeof body !== "object" || !("document" in body)) {
+    let body: unknown = await response.json().catch(() => null);
+    if (run !== workRun.current) return;
+    const code = body && typeof body === "object" && "error" in body ? (body as { error?: unknown }).error : "";
+    // Another tab may own the attempt. Observe it without admitting new work.
+    if (response.status === 409 && code === "already_processing") {
+      const until = Date.now() + 120_000;
+      while (Date.now() < until) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        if (run !== workRun.current) return;
+        const { data: row, error } = await supabase.from("documents").select("*").eq("id", documentId).eq("user_id", sessionData.session!.user.id).maybeSingle();
+        if (run !== workRun.current) return;
+        if (error) throw new Error("No connection");
+        if (!row) throw new Error("Scan unavailable");
+        if (row.status === "ready") { body = { document: row }; break; }
+        if (scanStatus(row.status, row.processing_started_at) === "failed") throw new Error(row.error === "timeout" || row.status === "processing" ? "Timed out" : "Couldn’t read this photo");
+      }
+    }
+    if (!body || typeof body !== "object" || !("document" in body)) {
       const code = body && typeof body === "object" && "error" in body ? (body as { error?: unknown }).error : "";
       if (code === "invalid_input") throw new Error("Image unreadable");
       if (code === "timeout") throw new Error("Timed out");
       if (code === "daily_limit") throw new Error("Daily limit reached");
+      if (code === "service_unavailable") throw new Error("Not connected");
+      if (code === "already_processing") throw new Error("Still processing. Try again shortly");
+      if (code === "attempt_superseded") throw new Error("Scan changed. Try again");
+      if (code === "original_unavailable") throw new Error("Original unavailable");
       throw new Error("Couldn’t read this photo");
     }
     const scan = resultToScan((body as { document: Parameters<typeof resultToScan>[0] }).document, photoUrl);
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
     setProcessingId(null);
     setCurrent(scan);
     if (user) setRefresh((count) => count + 1);
@@ -285,7 +315,11 @@ export function SidApp({ preview = "" }: { preview?: string }) {
 
   async function showFile(file?: File) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
+    if (isPreview) {
+      setNotice("Sample preview only");
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       setNotice("Image files only");
       return;
     }
@@ -294,6 +328,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       return;
     }
     stopWork();
+    const run = workRun.current;
     setModal(null);
     setAccountMenu(false);
     setDragging(false);
@@ -303,6 +338,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     localPhoto.current = url;
     setPhoto(url);
     setCurrent(null);
+    setProcessingId(null);
     setScreen("processing");
     setStage("Reading");
     try {
@@ -315,6 +351,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
         sessionData = { session: data.session };
       }
       const ownerId = sessionData.session.user.id;
+      if (run !== workRun.current) return;
       const documentId = crypto.randomUUID();
       const imagePath = `${ownerId}/${documentId}.jpg`;
       const { error: uploadError } = await supabase.storage.from("scans").upload(imagePath, file, {
@@ -322,19 +359,24 @@ export function SidApp({ preview = "" }: { preview?: string }) {
         upsert: false,
       });
       if (uploadError) throw new Error("Couldn’t upload photo");
+      if (run !== workRun.current) {
+        await supabase.storage.from("scans").remove([imagePath]);
+        return;
+      }
       const { error: insertError } = await supabase.from("documents").insert({
         id: documentId,
         image_path: imagePath,
-        status: "processing",
       });
       if (insertError) {
         await supabase.storage.from("scans").remove([imagePath]);
         throw new Error("Couldn’t save scan");
       }
+      if (run !== workRun.current) return;
       setProcessingId(documentId);
       timers.current.push(setTimeout(() => setStage("Rewriting"), 700));
-      await processDocument(documentId, url);
+      await processDocument(documentId, url, run);
     } catch (error) {
+      if (run !== workRun.current) return;
       setErrorReason(error instanceof Error ? error.message : "Couldn’t read this photo");
       setScreen("error");
     }
@@ -485,14 +527,19 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       return;
     }
     const documentId = chosen?.id ?? processingId;
-    if (!documentId || !photo) {
+    if (!documentId) {
       picker.current?.click();
       return;
     }
+    stopWork();
+    const run = workRun.current;
+    setProcessingId(documentId);
+    setPhoto(chosen?.photoUrl || photo);
     setScreen("processing");
     setStage("Reading");
     timers.current.push(setTimeout(() => setStage("Rewriting"), 700));
-    void processDocument(documentId, chosen?.photoUrl || photo).catch((error) => {
+    void processDocument(documentId, chosen?.photoUrl || photo, run).catch((error) => {
+      if (run !== workRun.current) return;
       setErrorReason(error instanceof Error ? error.message : "Couldn’t read this photo");
       setScreen("error");
     });
@@ -670,15 +717,11 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             aria-label="Processing"
           >
             <div className="scanning-photo">
-              <ScanImage
+              {photo ? <ScanImage
                 src={photo}
                 alt="Uploaded photo"
-                onError={() => {
-                  setErrorReason("Image unreadable");
-                  setScreen("error");
-                  stopWork();
-                }}
-              />
+                onError={() => setPhoto("")}
+              /> : <Icon name="photo" />}
               <div className="scan-beam" aria-hidden="true" />
             </div>
             <p role="status" aria-live="polite">
@@ -703,6 +746,10 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             onUpload={home}
             onOpen={(scan) => {
               setCurrent(scan);
+              if (scan.status === "processing" || scan.status === "queued") {
+                retry(scan);
+                return;
+              }
               if (scan.status === "failed") {
                 setErrorReason("Too blurry");
                 setScreen("error");

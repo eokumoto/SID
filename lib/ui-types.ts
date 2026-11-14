@@ -10,9 +10,10 @@ export type Scan = {
   title: string;
   photoUrl: string;
   createdAt: string;
-  status: "ready" | "failed";
+  status: "queued" | "processing" | "ready" | "failed";
   text: string;
   sections: { label?: string; text: string }[];
   imagePath?: string;
   sample?: boolean;
+  warnings?: string[];
 };
