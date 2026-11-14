@@ -52,6 +52,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     initial === "processing" ? sampleScan.photoUrl : "",
   );
   const [stage, setStage] = useState("Reading");
+  const [processingId, setProcessingId] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
   const picker = useRef<HTMLInputElement>(null);
@@ -240,13 +241,55 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     };
   }, [user, isPreview, refresh]);
 
-  function showFile(file?: File) {
+  function resultToScan(
+    row: { id: string; title?: string | null; created_at?: string; status?: string; plain_text?: string | null; image_path?: string | null },
+    photoUrl: string,
+  ): Scan {
+    const text = row.plain_text ?? "";
+    return {
+      id: row.id,
+      title: row.title || text.split("\n")[0] || "Scan",
+      photoUrl,
+      createdAt: row.created_at ?? new Date().toISOString(),
+      status: row.status === "ready" ? "ready" : "failed",
+      text,
+      sections: text.split(/\n\s*\n/).filter(Boolean).map((section) => ({ text: section })),
+      imagePath: row.image_path ?? undefined,
+    };
+  }
+
+  async function processDocument(documentId: string, photoUrl: string) {
+    const supabase = getSupabase();
+    const { data: sessionData } = await supabase!.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) throw new Error("Not connected");
+    const response = await fetch("/api/process", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ documentId }),
+    });
+    const body: unknown = await response.json().catch(() => null);
+    if (!response.ok || !body || typeof body !== "object" || !("document" in body)) {
+      const code = body && typeof body === "object" && "error" in body ? (body as { error?: unknown }).error : "";
+      if (code === "invalid_input") throw new Error("Image unreadable");
+      if (code === "timeout") throw new Error("Timed out");
+      if (code === "daily_limit") throw new Error("Daily limit reached");
+      throw new Error("Couldn’t read this photo");
+    }
+    const scan = resultToScan((body as { document: Parameters<typeof resultToScan>[0] }).document, photoUrl);
+    setProcessingId(null);
+    setCurrent(scan);
+    if (user) setRefresh((count) => count + 1);
+    setScreen("reader");
+  }
+
+  async function showFile(file?: File) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setNotice("Image files only");
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > 5 * 1024 * 1024) {
       setNotice("Image too large");
       return;
     }
@@ -262,14 +305,39 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     setCurrent(null);
     setScreen("processing");
     setStage("Reading");
-    // UI only: never substitute sample output for a user's photo.
-    // Connect the documented Storage + document-id processing adapter here.
-    timers.current.push(
-      setTimeout(() => {
-        setErrorReason(navigator.onLine ? "Not connected" : "No connection");
-        setScreen("error");
-      }, 1600),
-    );
+    try {
+      const supabase = getSupabase();
+      if (!supabase) throw new Error("Not connected");
+      let { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error || !data.session) throw new Error("Not connected");
+        sessionData = { session: data.session };
+      }
+      const ownerId = sessionData.session.user.id;
+      const documentId = crypto.randomUUID();
+      const imagePath = `${ownerId}/${documentId}.jpg`;
+      const { error: uploadError } = await supabase.storage.from("scans").upload(imagePath, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+      if (uploadError) throw new Error("Couldn’t upload photo");
+      const { error: insertError } = await supabase.from("documents").insert({
+        id: documentId,
+        image_path: imagePath,
+        status: "processing",
+      });
+      if (insertError) {
+        await supabase.storage.from("scans").remove([imagePath]);
+        throw new Error("Couldn’t save scan");
+      }
+      setProcessingId(documentId);
+      timers.current.push(setTimeout(() => setStage("Rewriting"), 700));
+      await processDocument(documentId, url);
+    } catch (error) {
+      setErrorReason(error instanceof Error ? error.message : "Couldn’t read this photo");
+      setScreen("error");
+    }
   }
   const showFileRef = useRef(showFile);
   useEffect(() => {
@@ -416,18 +484,18 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       );
       return;
     }
-    if (!photo) {
+    const documentId = chosen?.id ?? processingId;
+    if (!documentId || !photo) {
       picker.current?.click();
       return;
     }
     setScreen("processing");
     setStage("Reading");
-    timers.current.push(
-      setTimeout(() => {
-        setErrorReason(navigator.onLine ? "Not connected" : "No connection");
-        setScreen("error");
-      }, 1000),
-    );
+    timers.current.push(setTimeout(() => setStage("Rewriting"), 700));
+    void processDocument(documentId, chosen?.photoUrl || photo).catch((error) => {
+      setErrorReason(error instanceof Error ? error.message : "Couldn’t read this photo");
+      setScreen("error");
+    });
   }
   const background = {
     cream: "#FBF4E4",
@@ -574,7 +642,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
         hidden
         aria-label="Upload image"
         onChange={(event) => {
-          showFile(event.target.files?.[0]);
+          void showFile(event.target.files?.[0]);
           event.target.value = "";
         }}
       />

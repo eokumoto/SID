@@ -41,9 +41,16 @@ These routes use clearly labeled sample documents. They do not log in, write acc
 
 Settings persist locally, including when reviewing samples. History samples reset on reload.
 
-## Backend boundary
+## Scanning setup
 
-This task implements the UI. Uploaded images stay in page memory and are released on replacement/unmount. An upload currently shows the processing layout followed by **Not connected** because there is no OCR/rewriting endpoint. It never shows sample output as the result of a user's photo. Selecting an image is limited to 10 MiB in this UI; the eventual backend/bucket must enforce their own limits.
+Uploads are stored privately in Supabase Storage, then processed by the server-only `/api/process` route. Gemini reads the image and creates the plain-language rewrite. Google Cloud Vision can optionally perform a second OCR read; when it is unavailable, a successful Gemini scan still completes.
+
+1. Apply the Supabase migrations, including `20261114000000_scan_processing.sql`.
+2. In `.env.local`, set the two public Supabase values, `SUPABASE_SERVICE_ROLE_KEY`, and `GEMINI_API_KEY`. `GEMINI_MODEL` defaults to the pinned `gemini-2.5-flash`.
+3. Enable anonymous sign-ins in Supabase Auth so a visitor can scan before logging in.
+4. To enable the second OCR pass, enable Cloud Vision API, give a service account Vision access, set `GOOGLE_CLOUD_CREDENTIALS` to its JSON credentials (or a base64-encoded copy), and set `VISION_ENABLED=true`.
+
+Images are limited to 5 MiB and JPEG, PNG, or WebP. Provider credentials stay on the server and are never sent to the browser.
 
 Login is optional; unconfigured auth reports **Not connected**. Email uses a two-step password flow: enter an email, then automatically continue to Log in for an existing email or Create account for a new email. New accounts provide Name and enter/confirm a password (at least 8 characters). The automatic check uses a private server-side Supabase RPC and sends no email. Auth is wired on the client, but preserving an in-memory guest scan across an OAuth/email-confirmation round trip and saving a newly processed scan still need the processing/storage flow. The UI must not claim those scans were saved until that backend succeeds. Account history currently loads the latest 100 rows, with five-minute photo URLs refreshed when history reloads. Pagination and automatic signed-URL renewal remain backend/integration work.
 
