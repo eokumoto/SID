@@ -70,8 +70,8 @@ Open them in a browser. Copy colors, spacing and layout from them. Do not copy t
    - Box positions come from Google Cloud Vision bounding boxes.
 6. **Settings.** Opened by the gear. Desktop: small panel under the navbar on the right. Phone: bottom sheet.
    - Font: segmented `OpenDyslexic | Lexend | Arial`.
-   - Size: slider (small A to large A).
-   - Spacing: segmented `Tight | Normal | Wide`.
+   - Size: slider (small A to large A). Applies to all site text, including navigation, buttons, dialogs, and extracted text; controls reflow at larger sizes.
+   - Spacing: segmented `Tight | Normal | Wide`. Applies letter, word, and line spacing across the whole site.
    - Background: 4 swatches: cream #FBF4E4, peach #F3E3CC, yellow #F6E9A8, dark #22232B.
    - Changes apply live. Save to localStorage; if logged in, also save to the account.
 7. **Log in / sign up.** Opened by `Log in`. Desktop: centered box over a dimmed page with an X. Phone: bottom sheet. No logo.

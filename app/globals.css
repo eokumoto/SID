@@ -49,6 +49,8 @@ body {
 button,
 input {
   font: inherit;
+  letter-spacing: inherit;
+  word-spacing: inherit;
 }
 button,
 a,
@@ -85,9 +87,18 @@ button svg {
   flex-shrink: 0;
 }
 .sid-app {
+  font-size: calc(16px * var(--text-scale, 1));
+  line-height: calc(1.7 * var(--line-scale, 1));
+  letter-spacing: var(--reader-tracking, 0.065em);
+  word-spacing: var(--reader-word-spacing, 0.15em);
+  overflow-wrap: anywhere;
   min-height: 100svh;
   background: var(--page-color);
   color: var(--text);
+}
+.sid-app :where(*) {
+  letter-spacing: var(--reader-tracking, 0.065em);
+  word-spacing: var(--reader-word-spacing, 0.15em);
 }
 .theme-dark {
   --text: #ede3cf;
@@ -119,8 +130,10 @@ button svg {
   color: var(--ink);
 }
 .navbar {
-  height: var(--navbar-height);
+  min-height: var(--navbar-height);
+  height: auto;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
@@ -134,6 +147,7 @@ button svg {
   align-items: center;
   gap: 16px;
   min-width: 0;
+  max-width: 100%;
   padding: 0;
   color: var(--text);
   background: transparent;
@@ -162,18 +176,22 @@ button svg {
   min-width: 0;
 }
 .brand-name {
-  font-size: 26px;
+  font-size: calc(26px * var(--text-scale, 1));
   font-weight: 700;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
+  letter-spacing: var(--reader-tracking, 0.06em);
+  line-height: calc(1.2 * var(--line-scale, 1));
 }
 .brand-subtitle {
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(1.5 * var(--line-scale, 1));
 }
 .navbar nav {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+  max-width: 100%;
   align-items: center;
   gap: 14px;
 }
@@ -187,7 +205,7 @@ button svg {
   border-bottom: 2px solid transparent;
   border-radius: 0;
   background: transparent;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
 }
 .nav-item.active {
   border-bottom-color: var(--blue);
@@ -207,7 +225,7 @@ button svg {
   border-radius: var(--radius);
   background: var(--blue);
   color: var(--cream);
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale, 1));
   font-weight: 700;
   text-decoration: none;
 }
@@ -253,7 +271,7 @@ button svg {
   border-radius: 50%;
   background: var(--peach);
   color: var(--blue);
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale, 1));
 }
 .account-area {
   position: relative;
@@ -277,7 +295,7 @@ button svg {
   min-height: 48px;
   white-space: nowrap;
   width: 100%;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
 }
 .account-menu button:hover {
   background: var(--peach);
@@ -303,7 +321,7 @@ button svg {
   width: min(42vw, 440px);
   min-width: 280px;
   height: 132px;
-  font-size: 30px;
+  font-size: calc(30px * var(--text-scale, 1));
   gap: 20px;
 }
 .upload-button .icon {
@@ -317,8 +335,8 @@ button svg {
   max-width: 620px;
   margin: 0;
   color: var(--muted);
-  font-size: 20px;
-  line-height: 1.7;
+  font-size: calc(20px * var(--text-scale, 1));
+  line-height: calc(1.7 * var(--line-scale, 1));
   text-align: center;
   text-wrap: balance;
 }
@@ -336,7 +354,7 @@ button svg {
   color: var(--blue);
   z-index: 20;
   pointer-events: none;
-  font-size: 25px;
+  font-size: calc(25px * var(--text-scale, 1));
 }
 .drop-overlay .icon {
   width: 56px;
@@ -377,10 +395,10 @@ button svg {
 }
 .processing-screen p {
   margin: 0;
-  font-size: 21px;
+  font-size: calc(21px * var(--text-scale, 1));
 }
 .sample-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   color: var(--muted);
 }
 .reader-screen {
@@ -419,7 +437,7 @@ button svg {
   background: transparent;
   color: var(--ink);
   padding: 9px 12px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   white-space: nowrap;
 }
 .segment button[aria-pressed="true"] {
@@ -434,7 +452,7 @@ button svg {
   width: 230px;
 }
 .view-toggle button {
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
 }
 .reader-split {
   display: grid;
@@ -555,8 +573,12 @@ button svg {
   padding: 6px 10px;
   background: rgb(251 244 228 / 0.96);
   color: var(--ink);
-  font-size: clamp(12px, 1.5vw, 20px);
-  line-height: 1.4;
+  font-size: clamp(
+    calc(12px * var(--text-scale, 1)),
+    calc(1.5vw * var(--text-scale, 1)),
+    calc(20px * var(--text-scale, 1))
+  );
+  line-height: calc(1.4 * var(--line-scale, 1));
   max-width: 86%;
 }
 .sample-overlays > div:first-child {
@@ -589,7 +611,7 @@ button svg {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   padding: 10px;
   background: var(--cream);
   color: var(--ink);
@@ -611,7 +633,7 @@ button svg {
   width: 42px;
 }
 .zoom-controls .zoom-reset {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   padding: 0 8px;
   min-width: 58px;
 }
@@ -674,7 +696,7 @@ button svg {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale, 1));
 }
 .history-title {
   white-space: nowrap;
@@ -682,14 +704,14 @@ button svg {
   text-overflow: ellipsis;
 }
 .history-meta time {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   color: var(--muted);
 }
 .failed-label {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   color: var(--brick);
 }
 .failed-label .icon {
@@ -705,7 +727,7 @@ button svg {
   padding: 8px;
   background: transparent;
   color: var(--blue);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
 }
 .delete-trigger {
   opacity: 0;
@@ -729,7 +751,7 @@ button svg {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   border-radius: 0;
 }
 .history-row.swiped .history-row-inner {
@@ -764,7 +786,7 @@ button svg {
 }
 .error-screen h1,
 .center-stage h1 {
-  font-size: 24px;
+  font-size: calc(24px * var(--text-scale, 1));
   font-weight: 400;
   margin: 6px 0 2px;
 }
@@ -774,7 +796,7 @@ button svg {
   border: 0;
   background: transparent;
   padding: 6px 16px;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
 }
 .theme-dark .text-button,
 .theme-dark .retry-button {
@@ -817,7 +839,7 @@ button svg {
   display: none;
 }
 .dialog h2 {
-  font-size: 21px;
+  font-size: calc(21px * var(--text-scale, 1));
   font-weight: 400;
   text-align: center;
   margin: 0 0 25px;
@@ -851,13 +873,13 @@ legend {
   padding: 0;
   margin-bottom: 10px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
 }
 .settings-fields .segment {
   width: 100%;
 }
 .font-segment button {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   padding: 8px 5px;
 }
 .size-control {
@@ -875,10 +897,10 @@ legend {
   height: 36px;
 }
 .small-a {
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale, 1));
 }
 .large-a {
-  font-size: 25px;
+  font-size: calc(25px * var(--text-scale, 1));
 }
 .background-options {
   display: flex;
@@ -921,13 +943,13 @@ legend {
   width: 100%;
 }
 .google-button {
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
   padding-left: 12px;
   padding-right: 12px;
 }
 .google-g {
   font-family: Arial, sans-serif;
-  font-size: 20px;
+  font-size: calc(20px * var(--text-scale, 1));
   font-weight: 700;
 }
 .or-divider {
@@ -935,7 +957,7 @@ legend {
   align-items: center;
   gap: 12px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   margin: 21px 0;
 }
 .or-divider::before,
@@ -957,7 +979,7 @@ legend {
   color: var(--text);
   border: 1px solid var(--text);
   border-radius: var(--radius);
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale, 1));
 }
 .login-dialog input::placeholder {
   color: var(--muted);
@@ -968,7 +990,7 @@ legend {
   gap: 8px;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   margin: 20px 0 0;
 }
 .error-message {
@@ -1023,7 +1045,7 @@ legend {
   padding: 12px 18px;
   background: var(--page-color);
   border: 1px solid var(--line);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   white-space: nowrap;
 }
 .toast .icon {
@@ -1034,8 +1056,7 @@ legend {
     --navbar-height: 112px;
   }
   .navbar {
-    height: var(--navbar-height);
-    padding: 12px 16px 40px;
+    padding: 12px 16px;
     gap: 8px;
   }
   .wordmark {
@@ -1050,29 +1071,26 @@ legend {
     height: 26px;
   }
   .brand-name {
-    font-size: 22px;
+    font-size: calc(22px * var(--text-scale, 1));
   }
   .brand-subtitle {
-    position: absolute;
-    left: 66px;
-    right: 16px;
-    bottom: 12px;
-    font-size: 10px;
-    line-height: 1.5;
+    position: static;
+    font-size: calc(10px * var(--text-scale, 1));
+    line-height: calc(1.5 * var(--line-scale, 1));
   }
   .home-screen {
     gap: 22px;
   }
   .upload-description {
     max-width: 30ch;
-    font-size: 16px;
+    font-size: calc(16px * var(--text-scale, 1));
   }
 
   .navbar nav {
     gap: 5px;
   }
   .nav-item {
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale, 1));
     gap: 5px;
     padding: 8px 6px;
   }
@@ -1081,7 +1099,7 @@ legend {
     height: 19px;
   }
   .login-trigger {
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale, 1));
     padding: 10px 12px;
   }
   .avatar {
@@ -1092,7 +1110,7 @@ legend {
     width: 78%;
     min-width: 0;
     height: 116px;
-    font-size: 27px;
+    font-size: calc(27px * var(--text-scale, 1));
     gap: 14px;
   }
   .upload-button .icon {
@@ -1121,7 +1139,7 @@ legend {
   .reader-top > .sample-label {
     top: -1px;
     right: 8px;
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale, 1));
     pointer-events: none;
   }
   .segment button {
@@ -1177,7 +1195,7 @@ legend {
     padding: 14px 8px 90px;
   }
   .sample-overlays > div {
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale, 1));
     padding: 5px 7px;
   }
   .photo-toolbar {
@@ -1194,7 +1212,7 @@ legend {
   }
   .original-toggle button {
     padding: 6px 9px;
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale, 1));
   }
   .zoom-controls {
     margin-right: auto;
@@ -1224,15 +1242,15 @@ legend {
     height: 52px;
   }
   .history-meta {
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale, 1));
     gap: 7px;
   }
   .history-meta time,
   .failed-label {
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale, 1));
   }
   .retry-button {
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale, 1));
     gap: 3px;
     padding: 4px;
   }
@@ -1295,7 +1313,7 @@ legend {
     height: 48px;
   }
   .dialog h2 {
-    font-size: 19px;
+    font-size: calc(19px * var(--text-scale, 1));
   }
   .settings-fields {
     gap: 19px;
@@ -1304,7 +1322,7 @@ legend {
     padding-top: 40px;
   }
   .font-segment button {
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale, 1));
   }
   .delete-dialog .dialog-content {
     padding-top: 38px;
@@ -1319,7 +1337,7 @@ legend {
   .toast {
     max-width: calc(100vw - 24px);
     bottom: 16px;
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale, 1));
   }
 }
 @media (max-width: 390px) {
@@ -1334,7 +1352,7 @@ legend {
     justify-content: center;
   }
   .nav-item {
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale, 1));
   }
   .reader-copy {
     overflow-wrap: anywhere;
@@ -1365,7 +1383,7 @@ legend {
   gap: 8px;
   padding: 20px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
 }
 @media (max-width: 700px) {
   .zoom-controls .icon-button {
@@ -1394,7 +1412,7 @@ legend {
   justify-content: space-between;
   gap: 12px;
   margin: -8px 0 16px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
 }
 .auth-email-row > span {
   min-width: 0;
@@ -1413,7 +1431,7 @@ legend {
 }
 .auth-alternatives .text-button,
 .auth-back {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   padding-left: 0;
   padding-right: 0;
 }
@@ -1432,15 +1450,15 @@ legend {
   height: 36px;
 }
 .auth-sent p {
-  font-size: 14px;
-  line-height: 1.7;
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(1.7 * var(--line-scale, 1));
   margin: 0;
   text-align: left;
 }
 .auth-feedback.error-message {
   align-items: flex-start;
   justify-content: flex-start;
-  line-height: 1.6;
+  line-height: calc(1.6 * var(--line-scale, 1));
 }
 .auth-feedback.error-message .icon {
   margin-top: 2px;
@@ -1451,7 +1469,7 @@ legend {
     --navbar-height: 112px;
   }
   .navbar {
-    padding: 12px 24px 40px;
+    padding: 12px 24px;
   }
   .brand-icon {
     width: 40px;
@@ -1462,14 +1480,11 @@ legend {
     height: 26px;
   }
   .brand-name {
-    font-size: 22px;
+    font-size: calc(22px * var(--text-scale, 1));
   }
   .brand-subtitle {
-    position: absolute;
-    left: 80px;
-    right: 24px;
-    bottom: 12px;
-    font-size: 12px;
+    position: static;
+    font-size: calc(12px * var(--text-scale, 1));
   }
 }
 @media (max-width: 350px) {
@@ -1485,9 +1500,63 @@ legend {
     height: 22px;
   }
   .brand-name {
-    font-size: 20px;
+    font-size: calc(20px * var(--text-scale, 1));
   }
-  .brand-subtitle {
-    left: 56px;
-  }
+}
+
+/* Let enlarged and more widely spaced text reflow instead of clipping controls. */
+.sid-app[data-expanded-text="true"] .navbar {
+  height: auto;
+  min-height: var(--navbar-height);
+  flex-wrap: wrap;
+  padding: 12px 16px;
+}
+.sid-app[data-expanded-text="true"] .wordmark {
+  max-width: 100%;
+}
+.sid-app[data-expanded-text="true"] .brand-subtitle {
+  position: static;
+}
+.sid-app[data-expanded-text="true"] .navbar nav {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+  max-width: 100%;
+}
+.sid-app[data-expanded-text="true"] .upload-button {
+  height: auto;
+  min-height: 132px;
+  width: min(100%, 540px);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.sid-app[data-expanded-text="true"] .segment {
+  flex-wrap: wrap;
+}
+.sid-app[data-expanded-text="true"] .segment button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sid-app[data-expanded-text="true"] .font-segment button {
+  flex-basis: 100%;
+}
+.sid-app[data-expanded-text="true"] .view-toggle {
+  width: min(100%, 380px);
+}
+.sid-app[data-expanded-text="true"] .auth-email-row,
+.sid-app[data-expanded-text="true"] .delete-actions,
+.sid-app[data-expanded-text="true"] .photo-toolbar {
+  flex-wrap: wrap;
+}
+.sid-app[data-expanded-text="true"] .avatar {
+  width: auto;
+  height: auto;
+  min-width: 48px;
+  min-height: 48px;
+  padding: 4px;
+}
+.sid-app[data-expanded-text="true"] .toast {
+  white-space: normal;
+  width: max-content;
+  max-width: calc(100vw - 24px);
 }

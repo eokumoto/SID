@@ -444,6 +444,13 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           : "Arial, sans-serif",
     "--page-color": background,
     "--panel-color": settings.background === "cream" ? "#F3E3CC" : background,
+    "--text-scale": settings.size / 22,
+    "--line-scale":
+      settings.spacing === "Wide"
+        ? 1.95 / 1.7
+        : settings.spacing === "Tight"
+          ? 1.6 / 1.7
+          : 1,
     "--reader-size": `${settings.size}px`,
     "--reader-leading":
       settings.spacing === "Wide"
@@ -463,6 +470,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     <div
       className={`sid-app ${settings.background === "dark" ? "theme-dark" : ""}`}
       style={style}
+      data-expanded-text={settings.size !== 22 || settings.spacing !== "Normal"}
     >
       <a className="skip-link" href="#main">
         Skip to content
