@@ -69,9 +69,9 @@ Open them in a browser. Copy colors, spacing and layout from them. Do not copy t
    - The overlay is pinned to the photo: put photo and overlay boxes in one container, position boxes in % of the photo size, and transform the whole container. Library suggestion: `react-zoom-pan-pinch`.
    - Box positions come from Google Cloud Vision bounding boxes.
 6. **Settings.** Opened by the gear. Desktop: small panel under the navbar on the right. Phone: bottom sheet.
-   - Font: segmented `OpenDyslexic | Lexend | Arial`.
+   - Font: `OpenDyslexic | Lexend | Arial`, always arranged in a vertical list so changing text size does not switch layouts.
    - Size: slider (small A to large A). Applies to all site text, including navigation, buttons, dialogs, and extracted text; controls reflow at larger sizes.
-   - Spacing: segmented `Tight | Normal | Wide`. Applies letter, word, and line spacing across the whole site.
+   - Spacing: segmented `Tight | Normal | Wide`. Applies letter, word, and line spacing across the whole site. Tight uses 0em letter/word spacing and 1.6 line height; Normal uses 0.065em/0.15em and 1.7; Wide uses 0.14em/0.4em and 2.1.
    - Background: 4 swatches: cream #FBF4E4, peach #F3E3CC, yellow #F6E9A8, dark #22232B.
    - Changes apply live. Save to localStorage; if logged in, also save to the account.
 7. **Log in / sign up.** Opened by `Log in`. Desktop: centered box over a dimmed page with an X. Phone: bottom sheet. No logo.

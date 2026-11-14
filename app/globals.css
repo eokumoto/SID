@@ -318,17 +318,21 @@ button svg {
   padding: 28px 20px;
 }
 .upload-button {
-  width: min(42vw, 440px);
-  min-width: 280px;
-  height: 132px;
+  width: min(100%, 14.6667em);
+  min-width: 0;
+  min-height: 4.4em;
+  padding: 0.75em min(0.75em, 4vw);
+  white-space: nowrap;
   font-size: calc(30px * var(--text-scale, 1));
-  gap: 20px;
+  gap: 0.4em;
 }
 .upload-button .icon {
-  width: 38px;
-  height: 38px;
+  width: min(1.27em, 8vw);
+  height: min(1.27em, 8vw);
 }
 .home-screen {
+  justify-content: flex-start;
+  padding-top: clamp(48px, 20svh, 180px);
   gap: 28px;
 }
 .upload-description {
@@ -878,6 +882,9 @@ legend {
 .settings-fields .segment {
   width: 100%;
 }
+.font-segment {
+  flex-direction: column;
+}
 .font-segment button {
   font-size: calc(11px * var(--text-scale, 1));
   padding: 8px 5px;
@@ -1107,15 +1114,7 @@ legend {
     height: 48px;
   }
   .upload-button {
-    width: 78%;
-    min-width: 0;
-    height: 116px;
     font-size: calc(27px * var(--text-scale, 1));
-    gap: 14px;
-  }
-  .upload-button .icon {
-    width: 32px;
-    height: 32px;
   }
   .drop-overlay {
     inset: calc(var(--navbar-height) + 11px) 10px 10px;
@@ -1504,58 +1503,30 @@ legend {
   }
 }
 
-/* Let enlarged and more widely spaced text reflow instead of clipping controls. */
-.sid-app[data-expanded-text="true"] .navbar {
-  height: auto;
-  min-height: var(--navbar-height);
-  flex-wrap: wrap;
-  padding: 12px 16px;
-}
-.sid-app[data-expanded-text="true"] .wordmark {
-  max-width: 100%;
-}
-.sid-app[data-expanded-text="true"] .brand-subtitle {
-  position: static;
-}
-.sid-app[data-expanded-text="true"] .navbar nav {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  margin-left: auto;
-  max-width: 100%;
-}
-.sid-app[data-expanded-text="true"] .upload-button {
-  height: auto;
-  min-height: 132px;
-  width: min(100%, 540px);
-  min-width: 0;
+/* Reflow controls consistently at every text size and spacing setting. */
+.sid-app .segment {
   flex-wrap: wrap;
 }
-.sid-app[data-expanded-text="true"] .segment {
-  flex-wrap: wrap;
-}
-.sid-app[data-expanded-text="true"] .segment button {
+.sid-app .segment button {
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.sid-app[data-expanded-text="true"] .font-segment button {
-  flex-basis: 100%;
-}
-.sid-app[data-expanded-text="true"] .view-toggle {
+.sid-app .view-toggle {
   width: min(100%, 380px);
 }
-.sid-app[data-expanded-text="true"] .auth-email-row,
-.sid-app[data-expanded-text="true"] .delete-actions,
-.sid-app[data-expanded-text="true"] .photo-toolbar {
+.sid-app .auth-email-row,
+.sid-app .delete-actions,
+.sid-app .photo-toolbar {
   flex-wrap: wrap;
 }
-.sid-app[data-expanded-text="true"] .avatar {
+.sid-app .avatar {
   width: auto;
   height: auto;
   min-width: 48px;
   min-height: 48px;
   padding: 4px;
 }
-.sid-app[data-expanded-text="true"] .toast {
+.sid-app .toast {
   white-space: normal;
   width: max-content;
   max-width: calc(100vw - 24px);

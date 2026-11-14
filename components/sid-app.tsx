@@ -447,30 +447,34 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     "--text-scale": settings.size / 22,
     "--line-scale":
       settings.spacing === "Wide"
-        ? 1.95 / 1.7
+        ? 2.1 / 1.7
         : settings.spacing === "Tight"
           ? 1.6 / 1.7
           : 1,
     "--reader-size": `${settings.size}px`,
     "--reader-leading":
       settings.spacing === "Wide"
-        ? 1.95
+        ? 2.1
         : settings.spacing === "Tight"
           ? 1.6
           : 1.7,
     "--reader-tracking":
       settings.spacing === "Wide"
-        ? ".09em"
+        ? ".14em"
         : settings.spacing === "Tight"
-          ? ".05em"
+          ? "0em"
           : ".065em",
-    "--reader-word-spacing": settings.spacing === "Wide" ? ".25em" : ".15em",
+    "--reader-word-spacing":
+      settings.spacing === "Wide"
+        ? ".4em"
+        : settings.spacing === "Tight"
+          ? "0em"
+          : ".15em",
   } as CSSProperties;
   return (
     <div
       className={`sid-app ${settings.background === "dark" ? "theme-dark" : ""}`}
       style={style}
-      data-expanded-text={settings.size !== 22 || settings.spacing !== "Normal"}
     >
       <a className="skip-link" href="#main">
         Skip to content
