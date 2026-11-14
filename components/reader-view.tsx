@@ -102,6 +102,10 @@ export function ReaderView({
         </div>
         {scan.sample && <span className="sample-label">Sample</span>}
       </div>
+      {!scan.sample && <p className="sample-label">Simplified by AI. Check the original for anything important.</p>}
+      {scan.warnings?.some((warning) => warning === "vision_disabled" || warning === "vision_unavailable") && (
+        <p className="sample-label" role="status">Second read unavailable; check the original.</p>
+      )}
       {view === "text" ? (
         <>
           <div className="reader-split">

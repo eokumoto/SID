@@ -45,20 +45,27 @@ Settings persist locally, including when reviewing samples. History samples rese
 
 Uploads are stored privately in Supabase Storage, then processed by the server-only `/api/process` route. Gemini reads the image and creates the plain-language rewrite. Google Cloud Vision can optionally perform a second OCR read; when it is unavailable, a successful Gemini scan still completes.
 
-1. Apply the Supabase migrations, including `20261114000000_scan_processing.sql`.
-2. In `.env.local`, set the two public Supabase values, `SUPABASE_SERVICE_ROLE_KEY`, and `GEMINI_API_KEY`. `GEMINI_MODEL` defaults to the pinned `gemini-2.5-flash`.
+1. Apply all Supabase migrations in order, including `20261114000000_scan_processing.sql` and `20261114010000_processing_claims.sql`. Deploy the new client and route together after the migrations; older clients that insert `status` are deliberately rejected by the restricted input permissions.
+2. In `.env.local` and the deployment environment, set the two public Supabase values, `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`), and `GEMINI_API_KEY`. `GEMINI_MODEL` defaults to the pinned `gemini-2.5-flash`; confirm the configured model is available to your key before the live scan check. `DAILY_LIMIT` defaults to 20 admitted attempts per user per UTC day, including attempts that fail.
 3. Enable anonymous sign-ins in Supabase Auth so a visitor can scan before logging in.
 4. To enable the second OCR pass, enable Cloud Vision API, give a service account Vision access, set `GOOGLE_CLOUD_CREDENTIALS` to its JSON credentials (or a base64-encoded copy), and set `VISION_ENABLED=true`.
 
 Images are limited to 5 MiB and JPEG, PNG, or WebP. Provider credentials stay on the server and are never sent to the browser.
 
-Login is optional; unconfigured auth reports **Not connected**. Email uses a two-step password flow: enter an email, then automatically continue to Log in for an existing email or Create account for a new email. New accounts provide Name and enter/confirm a password (at least 8 characters). The automatic check uses a private server-side Supabase RPC and sends no email. Auth is wired on the client, but preserving an in-memory guest scan across an OAuth/email-confirmation round trip and saving a newly processed scan still need the processing/storage flow. The UI must not claim those scans were saved until that backend succeeds. Account history currently loads the latest 100 rows, with five-minute photo URLs refreshed when history reloads. Pagination and automatic signed-URL renewal remain backend/integration work.
+Processing claims and daily usage are reserved in one database transaction. Active duplicates observe the existing attempt; expired attempts can be retried after two minutes. Completion and failure writes match the attempt id, so old workers cannot overwrite a Retry or recreate a deleted scan. Gemini JSON is validated and retried once on malformed output; optional Vision runs in parallel with its own timeout. Ready rows reopen without provider calls.
+
+Deterministic checks compare protected values, occurrence counts and candidate names and store advisory flags without introducing a confirmation workflow. These conservative checks can flag harmless formatting changes and miss changed relationships, omitted prose or negation; they are not a proof of accuracy. Readers retain the original photo and show a warning when the second read was unavailable.
+
+Local checks use mocked providers and an embedded PostgreSQL engine with minimal Supabase schemas. They do not validate hosted Supabase settings, provider access or image quality. To finish the live milestone, apply the migrations, configure credentials, enable anonymous sign-in, deploy, then upload a public-text photo as a guest and an account. Compare the rewrite with the photo, reopen account history, exercise Retry and confirm the photo/text survive a reload. Guest-to-existing-account history imports remain separate work.
+
+Login is optional; unconfigured auth reports **Not connected**. Email uses a two-step password flow: enter an email, then automatically continue to Log in for an existing email or Create account for a new email. New accounts provide Name and enter/confirm a password (at least 8 characters). The automatic check uses a private server-side Supabase RPC and sends no email. New scans are stored under the active guest or account identity. Preserving guest scans across an OAuth/email-confirmation round trip or importing them into an existing account still needs the guest-history integration; do not assume those scans transfer after login. Account history currently loads the latest 100 rows, with five-minute photo URLs refreshed when history reloads. Pagination and automatic signed-URL renewal remain backend/integration work.
 
 The initial Supabase migration remains unchanged. [DATA_MODEL.md](docs/DATA_MODEL.md) and [API.md](docs/API.md) contain earlier backend planning, including some superseded input/review assumptions; reconcile them with the current UI spec before implementing those features. Do not build their older confirmation-flag or paste-text flows into this UI.
 
 ## Checks
 
 ```sh
+npm test
 npm run lint
 npm run typecheck
 npm run build

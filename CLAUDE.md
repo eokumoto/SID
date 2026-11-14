@@ -2,7 +2,7 @@
 
 Read [docs/UI_SPEC.md](docs/UI_SPEC.md) for the current UI requirements. It supersedes older UI instructions in this file and the planning docs: one native Upload control; no paste-text input, custom camera or confirmation flags; optional Google or email/password login with automatic email routing and a signup Name field; minimal copy and the specified cream/navy palette. Do not reintroduce a mandatory confirmation workflow or explanatory reader labels from earlier plans.
 
-The UI is implemented in `components/sid-app.tsx` with modular reader/settings/history/dialog components. Sample previews are explicit URL states documented in README and must never masquerade as real scan output or account authentication. OCR/AI processing is not connected. Keep backend-dependent actions honest about unavailable services.
+The UI is implemented in `components/sid-app.tsx` with modular reader/settings/history/dialog components. Sample previews are explicit URL states documented in README and must never masquerade as real scan output or account authentication. Image uploads and Gemini processing are connected through `app/api/process`; they require the migrations and environment setup in README. Live provider behavior still needs verification with a configured project. Keep backend-dependent actions honest about unavailable services.
 
 The backend notes below are earlier planning guidance. Reconcile them with the current UI spec before implementing backend features. Preserve secret isolation, owner checks, RLS and conditional processing writes.
 
