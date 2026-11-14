@@ -6,7 +6,7 @@ import type { ReaderSettings } from "./ui-types";
 const key = "sid.reader.settings";
 const defaults: ReaderSettings = {
   font: "OpenDyslexic",
-  size: 22,
+  size: 21,
   spacing: "Normal",
   background: "cream",
   reduceMotion: false,
@@ -26,9 +26,15 @@ export function validateSettings(value: unknown): ReaderSettings {
       : defaults.font,
     size:
       typeof v.size === "number" && Number.isFinite(v.size)
-        ? Math.min(36, Math.max(20, v.size))
+        ? Math.min(30, Math.max(14, v.size))
         : defaults.size,
-    spacing: ["Tight", "Normal", "Wide"].includes(v.spacing ?? "")
+    spacing: [
+      "Tight",
+      "Slightly tight",
+      "Normal",
+      "Slightly wide",
+      "Wide",
+    ].includes(v.spacing ?? "")
       ? v.spacing!
       : defaults.spacing,
     background: ["cream", "peach", "dark", "navy"].includes(

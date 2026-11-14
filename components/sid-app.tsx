@@ -512,6 +512,21 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     dark: "#22232B",
     navy: "#1F2A44",
   }[settings.background];
+  const spacing = {
+    Tight: { leading: 1.6, tracking: "0em", wordSpacing: "0em" },
+    "Slightly tight": {
+      leading: 1.65,
+      tracking: ".03em",
+      wordSpacing: ".06em",
+    },
+    Normal: { leading: 1.7, tracking: ".065em", wordSpacing: ".15em" },
+    "Slightly wide": {
+      leading: 1.9,
+      tracking: ".10em",
+      wordSpacing: ".28em",
+    },
+    Wide: { leading: 2.1, tracking: ".14em", wordSpacing: ".4em" },
+  }[settings.spacing];
   const style = {
     fontFamily:
       settings.font === "OpenDyslexic"
@@ -522,31 +537,11 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     "--page-color": background,
     "--panel-color": settings.background === "cream" ? "#F3E3CC" : background,
     "--text-scale": settings.size / 22,
-    "--line-scale":
-      settings.spacing === "Wide"
-        ? 2.1 / 1.7
-        : settings.spacing === "Tight"
-          ? 1.6 / 1.7
-          : 1,
+    "--line-scale": spacing.leading / 1.7,
     "--reader-size": `${settings.size}px`,
-    "--reader-leading":
-      settings.spacing === "Wide"
-        ? 2.1
-        : settings.spacing === "Tight"
-          ? 1.6
-          : 1.7,
-    "--reader-tracking":
-      settings.spacing === "Wide"
-        ? ".14em"
-        : settings.spacing === "Tight"
-          ? "0em"
-          : ".065em",
-    "--reader-word-spacing":
-      settings.spacing === "Wide"
-        ? ".4em"
-        : settings.spacing === "Tight"
-          ? "0em"
-          : ".15em",
+    "--reader-leading": spacing.leading,
+    "--reader-tracking": spacing.tracking,
+    "--reader-word-spacing": spacing.wordSpacing,
   } as CSSProperties;
   return (
     <div
@@ -744,7 +739,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             </button>
             <button
               type="button"
-              className="text-button"
+              className="button outlined"
               onClick={() => picker.current?.click()}
             >
               New photo

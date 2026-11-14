@@ -44,8 +44,8 @@ export function SettingsPanel({
             <input
               aria-label="Text size"
               type="range"
-              min="20"
-              max="36"
+              min="14"
+              max="30"
               step="1"
               value={settings.size}
               aria-valuetext={`${settings.size} pixels`}
@@ -60,18 +60,39 @@ export function SettingsPanel({
         </fieldset>
         <fieldset>
           <legend>Spacing</legend>
-          <div className="segment">
-            {(["Tight", "Normal", "Wide"] as const).map((spacing) => (
-              <button
-                type="button"
-                key={spacing}
-                aria-pressed={settings.spacing === spacing}
-                onClick={() => onChange({ ...settings, spacing })}
-              >
-                {spacing}
-              </button>
-            ))}
-          </div>
+          <label className="spacing-control">
+            <span>Tight</span>
+            <input
+              aria-label="Text spacing"
+              type="range"
+              min="0"
+              max="4"
+              step="1"
+              value={[
+                "Tight",
+                "Slightly tight",
+                "Normal",
+                "Slightly wide",
+                "Wide",
+              ].indexOf(settings.spacing)}
+              aria-valuetext={settings.spacing}
+              onChange={(event) =>
+                onChange({
+                  ...settings,
+                  spacing: (
+                    [
+                      "Tight",
+                      "Slightly tight",
+                      "Normal",
+                      "Slightly wide",
+                      "Wide",
+                    ] as const
+                  )[Number(event.target.value)],
+                })
+              }
+            />
+            <span>Wide</span>
+          </label>
         </fieldset>
         <fieldset>
           <legend>Background</legend>

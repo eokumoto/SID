@@ -1,7 +1,12 @@
 export type ReaderSettings = {
   font: "OpenDyslexic" | "Lexend" | "Arial";
   size: number;
-  spacing: "Tight" | "Normal" | "Wide";
+  spacing:
+    | "Tight"
+    | "Slightly tight"
+    | "Normal"
+    | "Slightly wide"
+    | "Wide";
   background: "cream" | "peach" | "dark" | "navy";
   reduceMotion: boolean;
 };

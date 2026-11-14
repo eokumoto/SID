@@ -140,6 +140,7 @@ button svg {
   gap: 18px;
   padding: 12px 32px;
   border-bottom: 1px solid var(--text);
+  background: color-mix(in srgb, var(--page-color) 92%, var(--blue));
   position: relative;
   z-index: 5;
 }
@@ -927,6 +928,10 @@ button svg {
   right: 24px;
   left: auto;
   bottom: auto;
+  max-height: calc(100svh - var(--navbar-height) - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   animation: settings-enter 250ms ease-out both;
 }
 @keyframes settings-enter {
@@ -985,9 +990,32 @@ button svg {
   background: var(--peach);
 }
 .motion-setting input {
-  width: 20px;
-  height: 20px;
-  accent-color: var(--blue);
+  appearance: none;
+  display: flex;
+  align-items: center;
+  width: 48px;
+  height: 24px;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid #f7efdc;
+  border-radius: 999px;
+  background: #d5d3d6;
+}
+.motion-setting input::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #666973;
+  transform: translateX(0);
+  transition: transform 150ms ease-out, background 150ms ease-out;
+}
+.motion-setting input:checked {
+  background: var(--blue);
+}
+.motion-setting input:checked::before {
+  background: var(--cream);
+  transform: translateX(24px);
 }
 .theme-dark .motion-setting,
 .theme-navy .motion-setting {
@@ -997,7 +1025,7 @@ button svg {
 }
 .theme-dark .motion-setting input,
 .theme-navy .motion-setting input {
-  accent-color: var(--blue);
+  border-color: #f7efdc;
 }
 fieldset {
   border: 0;
@@ -1034,6 +1062,35 @@ legend {
   accent-color: var(--blue);
   cursor: pointer;
   height: 36px;
+}
+.spacing-control {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+}
+.spacing-control input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+.spacing-control span {
+  font-size: calc(15px * var(--text-scale, 1));
+}
+.size-control > span,
+.spacing-control > span {
+  flex: 0 0 50px;
+  width: 50px;
+}
+.size-control > span:first-child,
+.spacing-control > span:first-child {
+  text-align: right;
+}
+.size-control > span:last-child,
+.spacing-control > span:last-child {
+  text-align: left;
 }
 .small-a {
   font-size: calc(15px * var(--text-scale, 1));
