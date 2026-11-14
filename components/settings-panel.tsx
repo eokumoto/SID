@@ -12,7 +12,12 @@ export function SettingsPanel({
   onClose: () => void;
 }) {
   return (
-    <Dialog label="Settings" className="settings-dialog" onClose={onClose}>
+    <Dialog
+      label="Settings"
+      className="settings-dialog"
+      animateClose
+      onClose={onClose}
+    >
       <div className="settings-fields">
         <fieldset>
           <legend>Font</legend>
@@ -71,7 +76,7 @@ export function SettingsPanel({
         <fieldset>
           <legend>Background</legend>
           <div className="background-options">
-            {(["cream", "peach", "yellow", "dark"] as const).map(
+            {(["cream", "peach", "navy", "dark"] as const).map(
               (background) => (
                 <button
                   type="button"
@@ -87,6 +92,19 @@ export function SettingsPanel({
               ),
             )}
           </div>
+        </fieldset>
+        <fieldset>
+          <legend>Motion</legend>
+          <label className="motion-setting">
+            <span>Reduce animations</span>
+            <input
+              type="checkbox"
+              checked={settings.reduceMotion}
+              onChange={(event) =>
+                onChange({ ...settings, reduceMotion: event.target.checked })
+              }
+            />
+          </label>
         </fieldset>
       </div>
     </Dialog>

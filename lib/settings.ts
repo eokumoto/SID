@@ -9,6 +9,7 @@ const defaults: ReaderSettings = {
   size: 22,
   spacing: "Normal",
   background: "cream",
+  reduceMotion: false,
 };
 const initial = JSON.stringify(defaults);
 let memory = initial;
@@ -30,11 +31,12 @@ export function validateSettings(value: unknown): ReaderSettings {
     spacing: ["Tight", "Normal", "Wide"].includes(v.spacing ?? "")
       ? v.spacing!
       : defaults.spacing,
-    background: ["cream", "peach", "yellow", "dark"].includes(
+    background: ["cream", "peach", "dark", "navy"].includes(
       v.background ?? "",
     )
       ? v.background!
       : defaults.background,
+    reduceMotion: typeof v.reduceMotion === "boolean" ? v.reduceMotion : false,
   };
 }
 function snapshot() {

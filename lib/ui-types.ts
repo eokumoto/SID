@@ -2,7 +2,8 @@ export type ReaderSettings = {
   font: "OpenDyslexic" | "Lexend" | "Arial";
   size: number;
   spacing: "Tight" | "Normal" | "Wide";
-  background: "cream" | "peach" | "yellow" | "dark";
+  background: "cream" | "peach" | "dark" | "navy";
+  reduceMotion: boolean;
 };
 
 export type Scan = {
