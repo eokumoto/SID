@@ -153,7 +153,7 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
       <div className="mobile-reader-tools"><button type="button" className="photo-thumbnail" aria-label="Open original photo" title="Open photo" onClick={openPhoto}>
         {photoUrl ? <ScanImage src={photoUrl} alt="Original scan thumbnail" onError={() => setPhotoFailed(true)} /> : <Icon name="photo" />}
       </button></div>
-    </> : <PhotoView key={scan.id} url={photoUrl} regions={scan.textRegions} onNewPhoto={onNewPhoto} onOverlayRemoved={scan.sample ? undefined : () => onOverlayRemoved?.(scan.id)} onSwipeBack={() => { setView("text"); setSwipeIn("from-left"); }} />
+    </> : <PhotoView key={scan.id} url={photoUrl} regions={scan.textRegions} onOverlayRemoved={scan.sample ? undefined : () => onOverlayRemoved?.(scan.id)} onSwipeBack={() => { setView("text"); setSwipeIn("from-left"); }} />}
     {listening && pro && <ListenPlayer text={fullText} settings={settings} preview={!!scan.sample} onWord={setWord} notify={notify} onClose={() => { setListening(false); setWord(null); }} />}
   </section>;
 }
