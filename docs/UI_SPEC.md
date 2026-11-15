@@ -2,7 +2,7 @@
 
 Current Free/Pro behavior is documented in [PRO_FEATURES.md](PRO_FEATURES.md). The Pro reference is for layout and behavior only: retain the current cream, peach, navy and dark themes; do not restore yellow backgrounds. Pro pricing is displayed as $3.99/month, with purchasing disabled until Stripe is connected.
 
-Current user update (November 14, 2026): Text view displays verbatim transcription with original wording and line breaks, with no simplification, automatic summary, or “Simplified by AI” label. Processing says Reading / Formatting. Photo view overlays the original transcribed lines in a readable font at their image positions, with a Readable / Original toggle. These requirements supersede rewriting/semantic regrouping instructions below; a future summarize button is deferred.
+Current user update (November 14, 2026): Text view displays verbatim transcription with original wording and line breaks, with no simplification, automatic summary, or “Simplified by AI” label. Processing says Loading. Photo view overlays the original transcribed lines in a readable font at their image positions, with a Readable / Original toggle. These requirements supersede rewriting/semantic regrouping instructions below; Summary is an optional Pro action and never replaces the full transcription.
 
 SID is a web app (Next.js) that helps dyslexic readers: upload a photo of text (menu, flyer, handout) and get it back rewritten in plain language, in a dyslexia-friendly layout. Build the UI exactly as described here. The two wireframe files next to this spec are the visual reference:
 
@@ -76,7 +76,7 @@ Open them in a browser. Copy colors, spacing and layout from them. Do not copy t
    - Font: `OpenDyslexic | Lexend | Arial`, always arranged in a vertical list so changing text size does not switch layouts.
    - Size: slider (small A to large A). Applies to all site text, including navigation, buttons, dialogs, and extracted text; controls reflow at larger sizes.
    - Spacing: segmented `Tight | Normal | Wide`. Applies letter, word, and line spacing across the whole site. Tight uses 0em letter/word spacing and 1.6 line height; Normal uses 0.065em/0.15em and 1.7; Wide uses 0.14em/0.4em and 2.1.
-   - Background: 4 swatches: cream #FBF4E4, peach #F3E3CC, yellow #F6E9A8, dark #22232B.
+   - Background: 4 swatches: cream #FBF4E4, peach #F3E3CC, navy (use the current CSS token), dark #22232B.
    - Changes apply live. Save to localStorage; if logged in, also save to the account.
 7. **Log in / sign up.** Opened by `Log in`. Desktop: centered box over a dimmed page with an X. Phone: bottom sheet. No logo.
    - Title "Log in or sign up".
