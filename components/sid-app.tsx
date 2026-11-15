@@ -9,7 +9,9 @@ import {
   useReaderSettings,
   validateSettings,
 } from "@/lib/settings";
-import { sampleHistory, sampleScan } from "@/lib/sample-scans";
+import { sampleHistory, sampleScan, proSampleScan } from "@/lib/sample-scans";
+import { useAllowance } from "@/lib/use-allowance";
+import { ProDialog } from "./pro-dialog";
 import type { ReaderSettings, Scan } from "@/lib/ui-types";
 import { Icon } from "./ui/icon";
 import { ScanImage } from "./ui/scan-image";
@@ -59,6 +61,13 @@ async function prepareUprightImage(file: File) {
   }
 }
 const previewScreens: Record<string, Screen> = {
+  pro: "reader",
+  "pro-menu": "reader",
+  "pro-settings": "reader",
+  "pro-home": "home",
+  "pro-limit": "home",
+  limit: "home",
+  upgrade: "home",
   reader: "reader",
   photo: "reader",
   processing: "processing",
@@ -80,12 +89,12 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const [readerReturnScreen, setReaderReturnScreen] =
     useState<ReaderReturnScreen>("home");
   const [homeReturn, setHomeReturn] = useState(false);
-  const [modal, setModal] = useState<"settings" | "login" | "help" | null>(
-    preview === "settings" ? "settings" : preview === "login" ? "login" : null,
+  const [modal, setModal] = useState<"settings" | "login" | "help" | "pro" | null>(
+    preview === "settings" || preview === "pro-settings" ? "settings" : preview === "login" ? "login" : preview === "upgrade" ? "pro" : null,
   );
   const [current, setCurrent] = useState<Scan | null>(
     initial === "reader" || initial === "processing" || initial === "error"
-      ? sampleScan
+      ? preview === "pro-menu" ? sampleHistory[1] : preview.startsWith("pro") ? proSampleScan : sampleScan
       : null,
   );
   const [photo, setPhoto] = useState<string>(
@@ -109,7 +118,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const accountId = useRef<string | null>(null);
   const settingsWrites = useRef<Promise<void>>(Promise.resolve());
   const [previewAccount, setPreviewAccount] = useState(
-    ["history", "empty", "delete"].includes(preview),
+    ["history", "empty", "delete"].includes(preview) || preview.startsWith("pro"),
   );
   const [accountMenu, setAccountMenu] = useState(false);
   const [history, setHistory] = useState<Scan[]>(
@@ -118,6 +127,11 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const [historyOwner, setHistoryOwner] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const { allowance, status: allowanceStatus } = useAllowance(refresh, isPreview);
+  const pro = isPreview ? preview.startsWith("pro") : allowance?.plan === "pro";
+  const remaining = isPreview ? (preview === "limit" || preview === "pro-limit" ? 0 : pro ? 142 : 3) : allowance?.remaining;
+  const outOfUploads = remaining === 0;
+  const openPro = () => { setModal("pro"); setAccountMenu(false); };
   const [deleting, setDeleting] = useState<Scan | null>(
     preview === "delete" ? sampleHistory[0] : null,
   );
@@ -364,8 +378,15 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       body: JSON.stringify({ documentId }),
     });
     let body: unknown = await response.json().catch(() => null);
+    setRefresh(count => count + 1);
     if (run !== workRun.current) return;
     const code = body && typeof body === "object" && "error" in body ? (body as { error?: unknown }).error : "";
+    if (response.status === 429 && code === "daily_limit") {
+      setProcessingId(null);
+      setScreen("home");
+      setNotice("Your uploads reset at midnight UTC");
+      return;
+    }
     // Another tab may own the attempt. Observe it without admitting new work.
     if (response.status === 409 && code === "already_processing") {
       const until = Date.now() + 120_000;
@@ -471,6 +492,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
 
   async function showFile(file?: File) {
     if (!file) return;
+    if (outOfUploads) { setNotice("No uploads left today"); home(); return; }
     if (isPreview) {
       setNotice("Sample preview only");
       return;
@@ -770,10 +792,18 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           </span>
         </button>
         <nav aria-label="Main navigation">
+          <span className={`upload-counter ${outOfUploads ? "exhausted" : ""} ${pro ? "pro-counter" : ""}`} aria-live="polite" aria-atomic="true" title={allowance ? `Resets ${new Date(allowance.resetsAt).toLocaleString()}` : undefined}>
+            {outOfUploads ? <Icon name="warning" /> : pro ? <Icon name="star" /> : null}
+            <span className="counter-desktop">{outOfUploads ? "No uploads left" : remaining !== undefined ? `${pro ? "Pro · " : ""}${remaining} uploads left` : allowanceStatus === "error" ? "Uploads unavailable" : "Checking uploads…"}</span>
+            <span className="counter-mobile">{remaining !== undefined ? `${remaining}${pro ? "" : " left"}` : "—"}</span>
+          </span>
+          {!pro && <button type="button" className="go-pro" aria-label="Go Pro" onClick={openPro}><Icon name="star" /><span className="pro-desktop-label">Go Pro</span><span className="pro-mobile-label">Pro</span></button>}
           {signedIn && (
             <button
               type="button"
               className={`nav-item ${screen === "history" ? "active" : ""}`}
+              aria-label="History"
+              title="History"
               aria-current={screen === "history" ? "page" : undefined}
               onClick={() => {
                 stopWork();
@@ -857,11 +887,13 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             <button
               type="button"
               className="upload-dropzone"
+              disabled={outOfUploads}
               aria-describedby="upload-description"
               onClick={() => picker.current?.click()}
             >
               <Icon name="photo" />
-              <span className="upload-drop-title">Drag an image here</span>
+              <span className="upload-drop-title">{outOfUploads ? "No uploads left today" : "Drag an image here"}</span>
+              {outOfUploads ? <span className="upload-format">{pro ? 150 : 10} more at midnight UTC</span> : <>
               <span className="upload-or" aria-hidden="true">
                 <i />
                 <b>or</b>
@@ -872,7 +904,10 @@ export function SidApp({ preview = "" }: { preview?: string }) {
                 Select image
               </span>
               <span className="upload-format">JPG, PNG or WebP</span>
+              </>}
             </button>
+            {outOfUploads && !pro && <button type="button" className="button" onClick={openPro}><Icon name="star" />Get 150 a day with Pro</button>}
+            {isPreview && <span className="sample-label">Sample</span>}
             <p id="upload-description" className="upload-description">
               Upload a photo. We’ll show the words in a clear font with more
               space.
@@ -908,10 +943,14 @@ export function SidApp({ preview = "" }: { preview?: string }) {
         )}
         {screen === "reader" && current && (
           <ReaderView
-            key={current.id + preview}
+            key={current.id + preview + (pro ? "pro" : "free")}
             scan={current}
             initialView={preview === "photo" ? "photo" : "text"}
             notify={setNotice}
+            settings={settings}
+            pro={pro}
+            onUpgrade={openPro}
+            initialSummary={preview === "pro" || preview === "pro-menu"}
             onNewPhoto={() => picker.current?.click()}
             onOverlayRemoved={(documentId) => void recordRemovedOverlay(documentId)}
           />
@@ -959,6 +998,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
               />
             </div>
             <h1>{scanErrorCopy(errorCode).title}</h1>
+            {["blurry", "no_text", "wrong_type", "too_big", "rate_limit"].includes(errorCode) && <span className="no-upload-used"><Icon name="check" />No upload used</span>}
             <p className="error-detail">{scanErrorCopy(errorCode).detail}</p>
             {scanErrorCopy(errorCode).canRetry && (
               <button type="button" className="button" onClick={() => retry()}>
@@ -992,8 +1032,11 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           settings={settings}
           onChange={changeSettings}
           onClose={() => setModal(null)}
+          pro={pro}
+          onUpgrade={openPro}
         />
       )}
+      {modal === "pro" && <ProDialog onClose={() => setModal(null)} />}
       {modal === "login" && (
         <AuthDialog
           key={passwordRecovery ? "recovery" : "login"}

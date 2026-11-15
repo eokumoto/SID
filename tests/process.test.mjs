@@ -15,7 +15,7 @@ function load(file, overrides = {}, globals = {}) {
 const accuracy = load('lib/accuracy.ts');
 const transcription = load('lib/transcription.ts');
 const { scanStatus } = load('lib/scan-state.ts');
-const { processingErrorMessage } = load('lib/scan-errors.ts');
+const { scanErrorCode, scanErrorCopy } = load('lib/scan-errors.ts');
 const id = '12345678-1234-4234-8234-123456789abc';
 const owner = '12345678-1234-4234-8234-123456789def';
 const result = { source_text: 'Room 204 costs $5.', plain_text: 'Room 204 costs $5.', flags: [], unsure_words: [], key_terms: [] };
@@ -29,7 +29,12 @@ function fixture(options = {}) {
   const doc = { id, user_id: owner, image_path: `${owner}/${id}.jpg`, status: 'queued', ...options.document };
   const client = {
     auth: { getUser: async () => ({ data: { user: { id: owner } } }) },
-    rpc: async () => { claims++; return { data: options.claim ?? { document: { ...doc, status: 'processing', attempt_id: 'attempt-1' } } }; },
+    rpc: async (name, args) => {
+      if (name === 'claim_pro_scan') { claims++; return { data: options.claim ?? { document: { ...doc, status: 'processing', attempt_id: 'attempt-1' } } }; }
+      assert.equal(name, 'finish_pro_scan');
+      writes.push({ data: args.outcome, scope: args });
+      return { data: options.superseded ? { error: 'superseded' } : { document: { ...doc, ...args.outcome } } };
+    },
     storage: { from: () => ({ download: async () => { downloads++; return { data: new Blob([options.bytes ?? Buffer.from([255,216,255,0])], { type: 'image/jpeg' }) }; } }) },
     from: () => {
       let value;
@@ -52,12 +57,15 @@ function fixture(options = {}) {
   const env = { NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SECRET_KEY: 'secret', GEMINI_API_KEY: 'key', VISION_ENABLED: 'false', ...options.env };
   const route = load('app/api/process/route.ts', {
     '@supabase/supabase-js': { createClient: () => client },
+    ...(options.visionAnnotation ? { 'node:crypto': { createSign: () => ({ update() {}, sign: () => 'fixture-signature' }) } } : {}),
     '../../../lib/accuracy': accuracy,
     '../../../lib/transcription': transcription,
   }, {
     process: { env },
     console: { warn: (...args) => logs.push(args) },
     fetch: async (url, init) => {
+      if (options.visionAnnotation && url === "https://oauth2.googleapis.com/token") return Response.json({ access_token: "fixture-vision-token" });
+      if (options.visionAnnotation && url.startsWith("https://vision.googleapis.com/")) return Response.json({ responses: [{ fullTextAnnotation: options.visionAnnotation }] });
       calls++;
       providerUrls.push(url);
       assert.ok(!url.includes('key='));
@@ -89,7 +97,7 @@ test('forged paths are rejected before privileged download', async () => {
   assert.equal((await f.run()).status, 400);
   assert.equal(f.stats().downloads, 0);
 });
-for (const [code, status] of [['already_processing', 409], ['daily_limit', 429], ['not_found', 404]]) {
+for (const [code, status] of [['already_processing', 409], ['daily_limit', 429], ['rate_limit',429], ['not_found', 404]]) {
   test(`${code} makes no provider call or download`, async () => {
     const f = fixture({ claim: { error: code } });
     assert.equal((await f.run()).status, status);
@@ -104,8 +112,8 @@ test('successful processing saves provenance and scopes completion to its attemp
   assert.equal(saved.plain_text, result.plain_text);
   assert.equal(saved.ocr_source, 'gemini');
   assert.deepEqual(saved.warnings, ['vision_disabled']);
-  assert.ok(f.writes[0].filters.some(([key, value]) => key === 'attempt_id' && value === 'attempt-1'));
-  assert.ok(f.writes[0].filters.some(([key, value]) => key === 'status' && value === 'processing'));
+  assert.equal(f.writes[0].scope.expected_attempt, 'attempt-1');
+  assert.equal(f.writes[0].scope.owner_id, owner);
 });
 test('default model uses the current documented replacement for restricted 2.5 Flash', async () => {
   const f = fixture();
@@ -127,12 +135,12 @@ test('malformed optional geometry does not fail transcription', async () => {
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).document.text_regions, []);
 });
-test('missing optional layout migration does not break an otherwise working scan', async () => {
+test('completion sends layout and text through the same atomic allowance RPC', async () => {
   const f = fixture({ layoutMigrationMissing: true });
   assert.equal((await f.run()).status, 200);
-  assert.equal(f.writes.length, 2);
-  assert.equal(Object.hasOwn(f.writes[1].data, 'text_regions'), false);
-  assert.equal(f.writes[1].data.plain_text, result.source_text);
+  assert.equal(f.writes.length, 1);
+  assert.equal(f.writes[0].data.text_regions.length, 0);
+  assert.equal(f.writes[0].data.ocr_text, result.source_text);
 });
 test('older saved scans display original OCR rather than their saved rewrite', () => {
   const source = '  EXACT punctuation: −3, 500 mg.\n\nSecond paragraph.\n';
@@ -169,36 +177,36 @@ test('oversized flag fields fail after one repair and failure writes are attempt
   const f = fixture({ outputs: [bad, bad] });
   const response = await f.run();
   assert.equal(response.status, 502);
-  assert.equal((await response.json()).error, 'bad_ai_json');
+  assert.equal((await response.json()).error, 'no_text');
   assert.equal(f.stats().calls, 2);
-  assert.ok(f.writes[0].filters.some(([key]) => key === 'attempt_id'));
+  assert.equal(f.writes[0].scope.expected_attempt, 'attempt-1');
 });
 test('upstream errors fail without an automatic retry storm', async () => {
   const f = fixture({ upstreamFailure: true });
   assert.equal((await f.run()).status, 502);
   assert.equal(f.stats().calls, 1);
 });
-for (const [status, reason] of [[400, 'ai_request_rejected'], [401, 'ai_auth_failed'], [403, 'ai_auth_failed'], [404, 'ai_model_unavailable'], [429, 'ai_rate_limited'], [503, 'ai_unavailable']]) {
+for (const status of [400,401,403,404,429,503]) {
   test(`Gemini ${status} produces a safe diagnostic without leaking upstream text`, async () => {
     const f = fixture({ upstreamFailure: true, upstreamStatus: status, upstreamBody: { error: { message: 'PRIVATE_DOCUMENT_OR_KEY' } } });
     const response = await f.run();
     assert.equal(response.status, 502);
     const body = await response.json();
-    assert.deepEqual(body, { error: 'ai_failed', reason });
-    assert.equal(f.writes[0].data.error, 'ai_failed');
+    assert.deepEqual(body, { error: 'server' });
+    assert.equal(f.writes[0].data.error, 'server');
     assert.equal(f.stats().calls, 1);
     assert.ok(!JSON.stringify([body, f.logs]).includes('PRIVATE_DOCUMENT_OR_KEY'));
-    assert.equal(f.logs[0][1].reason, reason);
+    assert.equal(f.logs[0][1].reason, 'gemini_failed');
   });
 }
 test('invalid API key details on a 400 response are distinguished from invalid requests', async () => {
   const f = fixture({ upstreamFailure: true, upstreamStatus: 400, upstreamBody: { error: { details: [{ reason: 'API_KEY_INVALID' }] } } });
-  assert.equal((await (await f.run()).json()).reason, 'ai_auth_failed');
+  assert.deepEqual(await (await f.run()).json(), { error: 'server' });
 });
 test('blocked and incomplete responses do not blame image readability', async () => {
   for (const [providerBody, reason] of [[{ promptFeedback: { blockReason: 'SAFETY' } }, 'ai_response_blocked'], [{ candidates: [{ finishReason: 'MAX_TOKENS' }] }, 'ai_output_incomplete'], [{ candidates: [] }, 'ai_empty_response']]) {
     const f = fixture({ providerBody });
-    assert.equal((await (await f.run()).json()).reason, reason);
+    assert.equal((await (await f.run()).json()).error, reason === 'ai_empty_response' ? 'no_text' : 'server');
     assert.equal(f.stats().calls, 1);
   }
 });
@@ -207,12 +215,13 @@ test('multipart Gemini text is joined and thought parts are ignored', async () =
   const f = fixture({ providerBody: { candidates: [{ finishReason: 'STOP', content: { parts: [{ thought: true, text: 'internal reasoning' }, { text: json.slice(0, 30) }, { text: json.slice(30) }] } }] } });
   assert.equal((await f.run()).status, 200);
 });
-test('UI messages separate provider limits and storage errors and ignore arbitrary content', () => {
-  assert.equal(processingErrorMessage('ai_failed', 'ai_rate_limited'), 'Gemini quota or rate limit reached');
-  assert.equal(processingErrorMessage('storage_failed'), 'Couldn’t download the saved photo');
-  assert.equal(processingErrorMessage('bad_ai_json'), 'AI returned an invalid response. Try again');
-  assert.equal(processingErrorMessage('ai_failed', '<private text>'), 'Couldn’t process this photo. Try again');
-  assert.equal(processingErrorMessage('__proto__'), 'Couldn’t process this photo. Try again');
+test('daily upload exhaustion is distinct from processing errors and arbitrary content is ignored', () => {
+  assert.equal(scanErrorCode('daily_limit'), 'daily_limit');
+  assert.equal(scanErrorCopy('daily_limit').title, 'No uploads left today');
+  assert.equal(scanErrorCopy('daily_limit').canRetry, false);
+  assert.equal(scanErrorCopy('already_processing').canRetry, true);
+  assert.equal(scanErrorCopy('<private text>').title, 'Something went wrong');
+  assert.equal(scanErrorCode('__proto__'), 'server');
 });
 test('a superseded worker cannot return success or fail a newer attempt', async () => {
   const f = fixture({ superseded: true });
@@ -257,4 +266,34 @@ test('accuracy checks detect protected value and occurrence changes', () => {
 test('equal inventories cannot detect swapped relationships or lost negation', () => {
   assert.equal(accuracy.checkAccuracy('Members $5, guests $10', 'Members $10, guests $5', []).length, 0);
   assert.equal(accuracy.checkAccuracy('Do not enter', 'Do enter', []).length, 0);
+});
+
+
+test('the request throttle supplies Retry-After without calling AI or charging an upload', async () => {
+  const f=fixture({claim:{error:'rate_limit',retry_after:120}});
+  const response=await f.run();
+  assert.equal(response.status,429);assert.equal(response.headers.get('retry-after'),'120');
+  assert.deepEqual(await response.json(),{error:'rate_limit'});
+  assert.equal(f.stats().calls,0);assert.equal(f.writes.length,0);
+  assert.equal(scanErrorCopy('rate_limit').canRetry,true);
+});
+
+
+test('merged Vision geometry enriches exact Gemini lines without replacing Gemini wording', async () => {
+  const vertices = [{ x: 10, y: 10 }, { x: 90, y: 12 }, { x: 90, y: 20 }, { x: 10, y: 18 }];
+  for (const visionText of [result.source_text, 'Room 204 costs $8.']) {
+    const f = fixture({
+      env: { VISION_ENABLED: 'true', GOOGLE_CLOUD_CREDENTIALS: JSON.stringify({ client_email: 'fixture@example.test', private_key: 'fixture' }) },
+      outputs: [JSON.stringify({ ...result, text_regions: [{ text: result.source_text, box_2d: [100, 100, 200, 900] }] })],
+      visionAnnotation: { text: visionText, pages: [{ width: 100, height: 100, blocks: [{ paragraphs: [{ words: [{ boundingBox: { vertices }, symbols: [{ text: visionText, property: { detectedBreak: { type: 'LINE_BREAK' } } }] }] }] }] }] },
+    });
+    const response = await f.run();
+    assert.equal(response.status, 200);
+    const doc = (await response.json()).document;
+    assert.equal(doc.ocr_text, result.source_text);
+    assert.equal(doc.ocr_source, 'gemini');
+    assert.deepEqual(doc.warnings, []);
+    if (visionText === result.source_text) assert.deepEqual(doc.text_regions[0].quad, [[100,100],[900,120],[900,200],[100,180]]);
+    else assert.equal(doc.text_regions[0].quad, undefined);
+  }
 });

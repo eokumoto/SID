@@ -6,10 +6,14 @@ export function SettingsPanel({
   settings,
   onChange,
   onClose,
+  pro,
+  onUpgrade,
 }: {
   settings: ReaderSettings;
   onChange: (next: ReaderSettings) => void;
   onClose: () => void;
+  pro: boolean;
+  onUpgrade: () => void;
 }) {
   return (
     <Dialog
@@ -19,6 +23,8 @@ export function SettingsPanel({
       onClose={onClose}
     >
       <div className="settings-fields">
+        <div className="reading-settings">
+          <h2><Icon name="settings" />Settings</h2>
         <fieldset>
           <legend>Font</legend>
           <div className="segment font-segment">
@@ -114,6 +120,22 @@ export function SettingsPanel({
             )}
           </div>
         </fieldset>
+        </div>
+        <section className="listen-settings" aria-label="Listen settings">
+          <h2><Icon name="speaker" />Listen{!pro && <span className="pro-tag">Pro</span>}</h2>
+          {!pro && <button type="button" className="listen-settings-lock" onClick={onUpgrade}>Explore Pro</button>}
+          <fieldset disabled={!pro}>
+            <legend>Voice</legend>
+            <div className="segment voice-segment">
+              {(["Calm", "Clear", "Warm"] as const).map(voice => <button type="button" key={voice} aria-pressed={settings.voice === voice} onClick={() => onChange({ ...settings, voice })}>{voice}</button>)}
+            </div>
+          </fieldset>
+          <fieldset disabled={!pro}>
+            <legend>Speed <strong>{settings.speed}×</strong></legend>
+            <input type="range" aria-label="Reading speed" min="0.25" max="2" step="0.05" value={settings.speed} aria-valuetext={`${settings.speed} times speed`} onChange={event => onChange({ ...settings, speed: Number(event.target.value) })} />
+            <div className="speed-labels"><span>0.25×</span><span>2×</span></div>
+          </fieldset>
+        </section>
       </div>
     </Dialog>
   );

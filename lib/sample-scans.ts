@@ -1,5 +1,12 @@
 import type { Scan } from "./ui-types";
 
+export const proSampleScan: Scan = {
+  id: "sample-housing", title: "Campus housing update", sample: true,
+  photoUrl: "/samples/housing-update.svg", createdAt: "2026-11-14T12:00:00Z", status: "ready",
+  text: "Campus housing update\n\nMove-out for winter break is Dec 18 by 5 PM. Leave your key at the front desk before you leave campus. Please check your room carefully and take your belongings with you. Make sure windows are closed, lights are switched off, and any personal appliances are unplugged.\n\nRooms will be checked on Dec 19. Items left behind will be stored for 30 days. Contact the housing office if you have questions about leaving your room or collecting stored belongings. Staff can explain the process and help you find the information you need before you leave.",
+  sections: [],
+};
+
 export const sampleScan: Scan = {
   id: "sample-flu",
   title: "Free flu shots at the Rec Center",
