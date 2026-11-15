@@ -12,6 +12,7 @@ for (const width of [1440, 720, 390, 320]) test(`Pro screens at ${width}px`, asy
    cancel(){clearInterval(timer);engine.speaking=false;},pause(){paused=true;},resume(){paused=false;},
    speak(u){clearInterval(timer);cursor=0;paused=false;engine.speaking=true;queueMicrotask(()=>u.onstart?.({}));const words=[...u.text.matchAll(/\S+/g)];timer=setInterval(()=>{if(paused)return;const word=words[cursor++];if(!word){clearInterval(timer);engine.speaking=false;u.onend?.({});}else u.onboundary?.({name:'word',charIndex:word.index,charLength:word[0].length});},120);}};
   Object.defineProperty(window,'speechSynthesis',{value:engine,configurable:true});
+  Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.__copied=text;}},configurable:true});
  });
  const page=await context.newPage(); const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/');
@@ -37,12 +38,15 @@ for (const width of [1440, 720, 390, 320]) test(`Pro screens at ${width}px`, asy
  assert(await page.getByRole('dialog',{name:'SID Pro'}).isVisible(),'free Listen opens upgrade');
  await page.goto('/?preview=pro');
  await page.getByRole('article',{name:'Transcribed text'}).waitFor();
- assert(await page.getByRole('complementary',{name:'Summary',exact:true}).isVisible(),'Pro summary visible');
+ assert(await page.getByRole('button',{name:'Summary'}).count()===0,'Summary removed');
  assert(await page.getByRole('article',{name:'Transcribed text'}).textContent().then(t=>t.includes('Make sure windows are closed')),'source remains intact');
- const position=await page.evaluate(()=>{const a=document.querySelector('.reader-panel').getBoundingClientRect(),s=document.querySelector('.summary-panel').getBoundingClientRect();return {article:a.toJSON(),summary:s.toJSON(),overflow:document.documentElement.scrollWidth-innerWidth};});
+ const position=await page.evaluate(()=>{const a=document.querySelector('.reader-panel').getBoundingClientRect(),c=document.querySelector('.reader-copy-button').getBoundingClientRect();return {article:a.toJSON(),copy:c.toJSON(),overflow:document.documentElement.scrollWidth-innerWidth};});
  assert(position.overflow<=1,'no overflow '+width+' '+JSON.stringify(position));
- if(width<=700)assert(position.summary.bottom<=position.article.top+1,'phone summary before source');
- else assert(position.summary.left>=position.article.right,'desktop summary beside source');
+ assert(position.copy.top>=position.article.top && position.copy.right<=position.article.right && position.copy.top-position.article.top<=24 && position.article.right-position.copy.right<=24,'Copy sits in the text panel top right corner');
+ await page.getByRole('button',{name:'Copy text',exact:true}).click();
+ await page.getByRole('button',{name:'Copied',exact:true}).waitFor();
+ assert(await page.evaluate(()=>window.__copied).then(t=>t.includes('Make sure windows are closed')),'Copy puts the full text on the clipboard');
+ await page.getByRole('button',{name:'Copy text',exact:true}).waitFor({timeout:4000});
  await page.screenshot({path:testInfo.outputPath(`pro-${width}.png`),fullPage:true});
  await page.getByRole('button',{name:'Listen',exact:true}).click();
  await page.getByRole('button',{name:'Pause reading',exact:true}).waitFor();
@@ -65,38 +69,7 @@ for (const width of [1440, 720, 390, 320]) test(`Pro screens at ${width}px`, asy
  await page.getByRole('dialog').waitFor({state:'detached'});
  await page.getByRole('button',{name:'Close Listen',exact:true}).click();
  assert(await page.locator('.listen-player').count()===0,'player closes');
- await page.getByRole('button',{name:'Photo',exact:true}).click();
- assert(await page.locator('.summary-panel').count()===0,'Photo closes the text summary');
- await page.getByRole('button',{name:'Summary',exact:true}).click();
- assert(await page.getByRole('article',{name:'Transcribed text'}).isVisible(),'Summary returns to full text');
- assert(await page.locator('.summary-panel').isVisible(),'Summary opens from Photo');
- await page.goto('/?preview=pro-menu');
- assert(await page.getByRole('complementary',{name:'Summary',exact:true}).textContent().then(t=>t.includes('Not needed for menus')),'menu explanation');
  assert(errors.length===0,'browser errors: '+errors.join(';'));
  console.log('PASS '+width+'px');await context.close();
 });
 
-test('a failed Summary can be retried without replacing the full text or charging another scan', async ({page}) => {
-  const owner='10000000-0000-4000-8000-000000000001';
-  const source='Campus housing update. Move out by Dec 18 at 5 PM. Leave your key at the front desk. Rooms will be checked on Dec 19. Items will be stored for 30 days. '+('Please take your belongings with you and contact the housing office if you need assistance. '.repeat(5));
-  const jwt=Buffer.from(JSON.stringify({sub:owner,role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url');
-  let scans=0,summaries=0;
-  await page.route('**/*', route => ['localhost','127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
-  await page.route('**/auth/v1/signup', route => route.fulfill({json:{access_token:`eyJhbGciOiJIUzI1NiJ9.${jwt}.test`,refresh_token:'fixture-refresh',expires_in:3600,token_type:'bearer',user:{id:owner,aud:'authenticated',is_anonymous:true,app_metadata:{},user_metadata:{},created_at:new Date().toISOString()}}}));
-  await page.route('**/storage/v1/object/scans/**',route=>route.fulfill({json:{Key:'fixture'}}));
-  await page.route('**/rest/v1/documents*',route=>route.fulfill({status:201,body:''}));
-  await page.route('**/api/account',route=>route.fulfill({json:{plan:'pro',limit:150,used:1,remaining:149,resetsAt:'2027-01-01T00:00:00Z'}}));
-  await page.route('**/api/process',route=>{scans++;return route.fulfill({json:{document:{id:route.request().postDataJSON().documentId,user_id:owner,status:'ready',ocr_text:source,plain_text:source,text_regions:[]}}});});
-  await page.route('**/api/summary',route=>{summaries++;return summaries===1?route.fulfill({status:503,json:{error:'unavailable'}}):route.fulfill({json:{bullets:['Move out by Dec 18 at 5 PM.','Leave your key at the front desk.','Rooms are checked on Dec 19. Items are stored for 30 days.']}});});
-  await page.goto('/');
-  await page.locator('input[type=file]').setInputFiles({name:'photo.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jYxQAAAAASUVORK5CYII=','base64')});
-  await expect(page.getByRole('article',{name:'Transcribed text'})).toContainText('Move out by Dec 18 at 5 PM.');
-  await expect(page.locator('.pro-counter')).toBeVisible();
-  await page.getByRole('button',{name:'Summary',exact:true}).click();
-  await expect(page.getByRole('complementary',{name:'Summary'})).toContainText('Couldn’t create a summary');
-  await expect(page.getByRole('article',{name:'Transcribed text'})).toContainText('Move out by Dec 18 at 5 PM.');
-  await page.getByRole('button',{name:'Summary',exact:true}).click();
-  await page.getByRole('button',{name:'Summary',exact:true}).click();
-  await expect(page.getByRole('complementary',{name:'Summary'}).locator('li')).toHaveCount(3);
-  expect(summaries).toBe(2);expect(scans).toBe(1);
-});

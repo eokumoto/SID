@@ -2082,18 +2082,16 @@ legend {
 .reader-action { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; padding: 9px 12px; border: 1px solid var(--line); background: var(--page-color); color: var(--text); font-size: calc(13px * var(--text-scale, 1)); }
 .reader-action .icon { width: 18px; height: 18px; }
 .reader-action.active { background: var(--accent); border-color: var(--accent); color: var(--accent-foreground); }
-.reader-action.unavailable { border-style: dashed; color: var(--muted); }
 .reader-top > .reader-sample { position: static; width: 100%; text-align: right; }
 .reader-side { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .reader-side .original-photo { flex: 1; width: 100%; min-height: 200px; }
 .reader-panel { padding-bottom: 32px; }
-.summary-panel { padding: 18px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--page-color); font-size: calc(16px * var(--text-scale, 1)); line-height: var(--reader-leading); }
-.summary-panel h2 { font-size: inherit; font-weight: 700; margin: 0 0 10px; }
-.summary-panel p { margin: 0; }
-.summary-panel ul { margin: 0; padding-left: 1.3em; }
-.summary-panel li + li { margin-top: .6em; }
-.summary-panel .summary-note { margin-top: 12px; color: var(--muted); font-size: calc(12px * var(--text-scale, 1)); }
-.summary-unavailable { border-style: dashed; border-color: var(--muted); }
+/* Copy: icon-only button in the text panel's top right corner; the first line leaves room for it. */
+.reader-panel { position: relative; }
+.reader-copy-button { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--page-color); color: var(--text); }
+.reader-copy-button .icon { width: 20px; height: 20px; }
+.reader-copy-button[aria-label="Copied"] { border-color: var(--accent); color: var(--accent); }
+.reader-copy > p:first-child { padding-right: 52px; }
 .no-upload-used { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border-radius: var(--radius); background: var(--surface-raised); color: var(--text); font-size: calc(13px * var(--text-scale, 1)); }
 .no-upload-used .icon { width: 18px; height: 18px; }
 .listen-player { display: flex; align-items: center; gap: 14px; position: sticky; bottom: 0; z-index: 6; padding: 12px 16px; margin-top: 18px; border: 1px solid var(--line); background: var(--surface-raised); color: var(--text); }
@@ -2147,7 +2145,6 @@ legend {
   .reader-split { flex-direction: column; }
   .reader-side { order: -1; }
   .reader-side .original-photo { display: none; }
-  .summary-panel { padding: 16px; }
   .settings-dialog { width: 100%; }
   .settings-dialog .settings-fields { grid-template-columns: minmax(0, 1fr); }
   .listen-settings { padding: 20px 0 0; border-left: 0; border-top: 1px solid var(--line); }
@@ -2183,7 +2180,7 @@ legend {
   .navbar .go-pro { min-width: 48px; padding: 6px; }
 }
 
-/* Pro tag on Listen/Summary: text normally, a star when the text wouldn't fit on one line (set by ReaderView). */
+/* Pro tag on Listen: text normally, a star when the text wouldn't fit on one line (set by ReaderView). */
 .reader-action .pro-tag .icon { display: none; width: 12px; height: 12px; }
 .compact-tags .reader-action .pro-tag { display: inline-grid; place-items: center; padding: 2px; }
 .compact-tags .reader-action .pro-tag .icon { display: block; }
@@ -2295,7 +2292,7 @@ legend {
   to { opacity: 1; }
 }
 
-/* Toggle box stacked (ReaderView adds .stacked when Listen/Summary wrap): rows share one width and the
+/* Toggle box stacked (ReaderView adds .stacked when Listen wraps): rows share one width and the
    box hugs the widest row. Phones keep the full-width box. */
 .reader-top.stacked { flex-direction: column; align-items: stretch; }
 .reader-top.stacked .view-toggle { width: auto; }

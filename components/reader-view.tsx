@@ -1,18 +1,15 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReaderSettings, Scan } from "@/lib/ui-types";
-import { summaryUnavailable } from "@/lib/pro";
-import { getSupabase } from "@/lib/supabase/client";
 import { Icon } from "./ui/icon";
-import { LoadingDots } from "./ui/loading-dots";
 import { ScanImage } from "./ui/scan-image";
 import { PhotoView, SWIPE_DISTANCE } from "./photo-view";
 import { ListenPlayer } from "./listen-player";
 
-export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView = "text", initialSummary = false, onOverlayRemoved }: {
+export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView = "text", onOverlayRemoved }: {
   scan: Scan; settings: ReaderSettings; pro: boolean; onUpgrade: () => void;
-  initialView?: "text" | "photo"; initialSummary?: boolean;
+  initialView?: "text" | "photo";
   onOverlayRemoved?: (documentId: string) => void;
   notify: (message: string) => void;
 }) {
@@ -22,56 +19,29 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
   const photoUrl = photoFailed ? "" : scan.photoUrl;
   const [listening, setListening] = useState(false);
   const [word, setWord] = useState<{ start: number; length: number } | null>(null);
-  const [summaryOpen, setSummaryOpen] = useState(initialSummary);
-  const [summary, setSummary] = useState<string[] | null>(null);
-  const [summaryMessage, setSummaryMessage] = useState("");
-  const [summaryFailed, setSummaryFailed] = useState(false);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const summaryRequest = useRef(false);
-  const unavailable = summaryUnavailable(scan.text);
   const blocks = scan.sections.length ? scan.sections : [{ text: scan.text }];
   const fullBlocks = blocks.map(block => block.label ? `${block.label}: ${block.text}` : block.text);
   const fullText = fullBlocks.join("\n\n");
-  const demoBullets = scan.id === "sample-housing" && !unavailable ? [
-    "Move out by Dec 18, 5 PM.",
-    "Leave your key at the front desk.",
-    "Rooms will be checked on Dec 19. Items left behind will be stored for 30 days.",
-  ] : null;
 
-  async function toggleSummary() {
-    if (!pro) { onUpgrade(); return; }
-    setView("text");
-    setSummaryOpen(open => !open);
-    if (summaryOpen || summary || (summaryMessage && !summaryFailed) || unavailable || demoBullets || summaryRequest.current) return;
-    summaryRequest.current = true;
-    setSummaryMessage("");
-    setSummaryFailed(false);
-    setSummaryLoading(true);
-    try {
-      const supabase = getSupabase();
-      const { data } = await supabase?.auth.getSession() ?? { data: { session: null } };
-      if (!data.session || scan.sample) throw Error("unavailable");
-      const response = await fetch("/api/summary", {
-        method: "POST", signal: AbortSignal.timeout(35_000),
-        headers: { Authorization: `Bearer ${data.session.access_token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId: scan.id }),
-      });
-      if (response.status === 403) { setSummaryOpen(false); onUpgrade(); return; }
-      const result = await response.json();
-      if (!response.ok) throw Error("unavailable");
-      if (typeof result.reason === "string") setSummaryMessage(result.reason);
-      else if (Array.isArray(result.bullets) && result.bullets.every((text: unknown) => typeof text === "string")) setSummary(result.bullets);
-      else throw Error("unavailable");
-    } catch { setSummaryMessage("Couldn’t create a summary. Your full text is still here."); setSummaryFailed(true); }
-    finally { summaryRequest.current = false; setSummaryLoading(false); }
+
+  // Copy puts the whole transcription on the clipboard; the icon shows a check for 2 seconds after.
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  async function copyText() {
+    try { await navigator.clipboard.writeText(fullText); setCopied(true); }
+    catch { notify("Couldn’t copy. Select the text to copy it instead"); }
   }
 
   // Set only by a swipe, so the incoming view slides in from that side; taps switch without animating.
   const [swipeIn, setSwipeIn] = useState<"from-right" | "from-left" | null>(null);
-  const openPhoto = () => { setView("photo"); setSummaryOpen(false); setSwipeIn(null); };
-  // Fit the toggle box to its content: if Listen/Summary wrap below Text/Photo, stack them
+  const openPhoto = () => { setView("photo"); setSwipeIn(null); };
+  // Fit the toggle box to its content: if Listen wraps below Text/Photo, stack them
   // (so the box hugs the widest row instead of spanning the full width). Then, if a Pro tag
-  // would push Listen/Summary past one line, show the tag as a star instead.
+  // would push Listen past one line, show the tag as a star instead.
   const top = useRef<HTMLDivElement>(null);
   const actions = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -111,7 +81,6 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
     const dy = event.changedTouches[0].clientY - start.y;
     if (dx < -SWIPE_DISTANCE && Math.abs(dy) < Math.abs(dx) * 0.5) { openPhoto(); setSwipeIn("from-right"); }
   };
-  const bullets = summary ?? demoBullets;
   const articleBlocks = fullBlocks.map((text, index) => {
     const start = fullBlocks.slice(0, index).reduce((length, block) => length + block.length + 2, 0);
     const highlight = word && word.start >= start && word.start < start + text.length
@@ -134,17 +103,12 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
           if (listening) setWord(null);
           setListening(!listening);
         }}><Icon name="speaker" />Listen{!pro && <span className="pro-tag"><span className="pro-tag-label">Pro</span><Icon name="star" /></span>}</button>
-        <button type="button" className={`reader-action ${summaryOpen ? "active" : ""} ${pro && unavailable ? "unavailable" : ""}`} aria-expanded={summaryOpen} onClick={() => void toggleSummary()}><Icon name="summary" />Summary{!pro && <span className="pro-tag"><span className="pro-tag-label">Pro</span><Icon name="star" /></span>}</button>
       </div>
     </div>
     {view === "text" ? <>
       <div className="reader-split">
-        <article className="reader-panel" aria-label="Transcribed text"><div className="reader-copy">{articleBlocks}</div></article>
+        <article className="reader-panel" aria-label="Transcribed text"><button type="button" className="reader-copy-button" aria-label={copied ? "Copied" : "Copy text"} title={copied ? "Copied" : "Copy text"} onClick={() => void copyText()}><Icon name={copied ? "check" : "copy"} /></button><div className="reader-copy">{articleBlocks}</div></article>
         <div className="reader-side">
-          {summaryOpen && <aside className={`summary-panel ${unavailable ? "summary-unavailable" : ""}`} aria-label="Summary" aria-busy={summaryLoading}>
-            <h2>Summary</h2>
-            {summaryLoading ? <p role="status">Creating summary<LoadingDots /></p> : bullets && !unavailable ? <><ul>{bullets.map((bullet, i) => <li key={i}>{bullet}</li>)}</ul><p className="summary-note">Full text stays visible.</p></> : <p role="status">{unavailable || summaryMessage || "Select Summary to get started."}</p>}
-          </aside>}
           <button type="button" className="original-photo" aria-label="Open original photo" title="Open photo" onClick={openPhoto}>
             {photoUrl ? <ScanImage src={photoUrl} alt="Original scan" onError={() => setPhotoFailed(true)} /> : <span className="missing-photo"><Icon name="photo" />Photo unavailable</span>}
           </button>

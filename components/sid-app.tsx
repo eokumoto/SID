@@ -1014,7 +1014,6 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             settings={settings}
             pro={pro}
             onUpgrade={openPro}
-            initialSummary={preview === "pro" || preview === "pro-menu"}
             onOverlayRemoved={(documentId) => void recordRemovedOverlay(documentId)}
           />
         )}
