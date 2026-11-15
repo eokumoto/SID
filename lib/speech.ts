@@ -5,10 +5,12 @@ export type SpeechMark = { start: number; length: number; time: number };
 // GOOGLE_TTS_API_KEY). Chirp 3: HD ignores SSML <mark>, so word timing is
 // estimated on the client. `fallback` is the older Neural2 voice, used only if
 // the HD request fails; it returns exact word timepoints.
-export const SPEECH_VOICES: Record<Voice, { hd: string; fallback: string }> = {
-  Calm: { hd: "en-US-Chirp3-HD-Achernar", fallback: "en-US-Neural2-F" },
-  Clear: { hd: "en-US-Chirp3-HD-Iapetus", fallback: "en-US-Neural2-D" },
-  Warm: { hd: "en-US-Chirp3-HD-Sulafat", fallback: "en-US-Neural2-C" },
+// `gemini` is the same voice through Gemini speech generation (GEMINI_API_KEY),
+// used when there is no Cloud TTS key.
+export const SPEECH_VOICES: Record<Voice, { hd: string; fallback: string; gemini: string }> = {
+  Calm: { hd: "en-US-Chirp3-HD-Achernar", fallback: "en-US-Neural2-F", gemini: "Achernar" },
+  Clear: { hd: "en-US-Chirp3-HD-Iapetus", fallback: "en-US-Neural2-D", gemini: "Iapetus" },
+  Warm: { hd: "en-US-Chirp3-HD-Sulafat", fallback: "en-US-Neural2-C", gemini: "Sulafat" },
 };
 
 const escapeXml = (text: string) => text.replace(/[&<>"']/g, char =>
@@ -53,6 +55,10 @@ export function estimateMarks(text: string, duration: number): SpeechMark[] {
   });
 }
 
+// ~600 characters is about 40 seconds of speech: quick to generate, and as WAV it
+// stays well under Vercel's 4.5 MB response limit.
+export const SPEECH_CHUNK_CHARS = 600;
+
 // Bound actual SSML bytes (including marks and escaping), not just text length.
 export function speechChunks(text: string) {
   const chunks: { text: string; offset: number }[] = [];
@@ -61,7 +67,7 @@ export function speechChunks(text: string) {
   for (const match of text.matchAll(/\S+/gu)) {
     const next = match.index + match[0].length;
     const candidate = text.slice(start, next);
-    if (end > start && (candidate.length > 1900 || new TextEncoder().encode(speechInput(candidate).ssml).length > 4700)) {
+    if (end > start && (candidate.length > SPEECH_CHUNK_CHARS || new TextEncoder().encode(speechInput(candidate).ssml).length > 4700)) {
       chunks.push({ text: text.slice(start, end), offset: start });
       start = match.index;
     }
