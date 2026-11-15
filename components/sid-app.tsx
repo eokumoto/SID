@@ -22,6 +22,7 @@ import { SettingsPanel } from "./settings-panel";
 import { ReaderView } from "./reader-view";
 import { HistoryList } from "./history-list";
 import { AuthDialog } from "./auth-dialog";
+import { AccountView } from "./account-view";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { scanStatus } from "@/lib/scan-state";
 import { scanErrorCode, scanErrorCopy, type ScanErrorCode } from "@/lib/scan-errors";
@@ -32,7 +33,7 @@ import {
   savePendingScan,
 } from "@/lib/pending-scan";
 
-type Screen = "home" | "processing" | "reader" | "history" | "error";
+type Screen = "home" | "processing" | "reader" | "history" | "account" | "error";
 type ReaderReturnScreen = "home" | "history";
 const MAX_UPRIGHT_IMAGE_DIMENSION = 2200;
 const UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -76,6 +77,8 @@ const previewScreens: Record<string, Screen> = {
   photo: "reader",
   processing: "processing",
   history: "history",
+  account: "account",
+  "pro-account": "account",
   empty: "history",
   delete: "history",
   error: "error",
@@ -123,9 +126,11 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const [notice, setNotice] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const accountId = useRef<string | null>(null);
+  // Set when Stripe's billing portal sends the user back to /?view=account.
+  const openAccountOnSignIn = useRef(false);
   const settingsWrites = useRef<Promise<void>>(Promise.resolve());
   const [previewAccount, setPreviewAccount] = useState(
-    ["history", "empty", "delete"].includes(preview) || preview.startsWith("pro"),
+    ["history", "empty", "delete", "account"].includes(preview) || preview.startsWith("pro"),
   );
   const [accountMenu, setAccountMenu] = useState(false);
   const [history, setHistory] = useState<Scan[]>(
@@ -147,7 +152,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const settings = useReaderSettings();
   const metadataName =
-    user?.user_metadata?.name ?? user?.user_metadata?.full_name;
+    user?.user_metadata?.display_name ?? user?.user_metadata?.name ?? user?.user_metadata?.full_name;
   const displayName =
     typeof metadataName === "string" ? metadataName.trim() : "";
   const signedIn = !!user || previewAccount;
@@ -205,6 +210,13 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     if (isPreview) return;
     const supabase = getSupabase();
     if (!supabase) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") === "account") {
+      openAccountOnSignIn.current = true;
+      params.delete("view");
+      const query = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : "") + window.location.hash);
+    }
     let active = true;
     function receiveUser(next: User | null) {
       if (!active) return;
@@ -224,6 +236,10 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       }
       accountId.current = next?.id ?? null;
       setUser(next);
+      if (next && openAccountOnSignIn.current) {
+        openAccountOnSignIn.current = false;
+        setScreen("account");
+      }
       if (next && !next.is_anonymous)
         window.setTimeout(() => importPendingScanRef.current(next), 0);
     }
@@ -885,6 +901,19 @@ export function SidApp({ preview = "" }: { preview?: string }) {
                   {previewAccount && (
                     <span className="sample-label">Sample</span>
                   )}
+                  <button
+                    type="button"
+                    aria-current={screen === "account" ? "page" : undefined}
+                    onClick={() => {
+                      stopWork();
+                      setModal(null);
+                      setScreen("account");
+                      setAccountMenu(false);
+                    }}
+                  >
+                    <Icon name="person" />
+                    Account
+                  </button>
                   <button type="button" onClick={() => void signOut()}>
                     <Icon name="logout" />
                     Log out
@@ -1019,6 +1048,17 @@ export function SidApp({ preview = "" }: { preview?: string }) {
               setHistoryOwner(null);
               setRefresh((n) => n + 1);
             }}
+          />
+        )}
+        {screen === "account" && signedIn && (
+          <AccountView
+            user={user}
+            displayName={displayName}
+            preview={isPreview}
+            pro={pro}
+            onUpgrade={openPro}
+            onSignOut={() => void signOut()}
+            notify={setNotice}
           />
         )}
         {screen === "error" && (

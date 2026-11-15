@@ -26,8 +26,10 @@ export type IconName =
   | "play"
   | "warning"
   | "back"
-  | "help";
+  | "help"
+  | "person";
 const paths: Record<IconName, React.ReactNode> = {
+  person: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
   star: <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z" />,
   summary: <path d="M4 6h16M4 10h16M4 14h10M4 18h7" />,
   pause: <path d="M8 5v14M16 5v14" />,
