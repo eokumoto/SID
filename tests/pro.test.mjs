@@ -28,10 +28,11 @@ function fixture(route, options={}) {
     },
   };
   const endpoint=load(route,{'@supabase/supabase-js':{createClient:()=>client},'../../../lib/pro':pro,'../../../lib/speech':speech,'../../../lib/accuracy':accuracy,'../../../lib/transcription':transcription},{
-    process:{env:{NEXT_PUBLIC_SUPABASE_URL:'https://sid.test',SUPABASE_SECRET_KEY:'server-key',GEMINI_API_KEY:'gemini-private',GOOGLE_TTS_API_KEY:'tts-private'}},
+    process:{env:{NEXT_PUBLIC_SUPABASE_URL:'https://sid.test',SUPABASE_SECRET_KEY:'server-key',GEMINI_API_KEY:'gemini-private',...(options.noCloud?{}:{GOOGLE_TTS_API_KEY:'tts-private'})}},
     fetch:async(url,init)=>{
       providers.push({url,init});assert.ok(!url.includes('key='));
-      if(url.includes('texttospeech'))return Response.json({audioContent:'AAAA',timepoints:[{markName:'w0',timeSeconds:0},{markName:'w1',timeSeconds:.3}]});
+      if(url.includes('-tts')){if(options.geminiQuota)return Response.json({error:{code:429,status:'RESOURCE_EXHAUSTED'}},{status:429});return Response.json({candidates:[{content:{parts:[{inlineData:{mimeType:'audio/L16;codec=pcm;rate=24000',data:Buffer.alloc(4800).toString('base64')}}]}}]});}
+      if(url.includes('texttospeech')){if(options.ttsDisabled)return Response.json({error:{code:403,status:'PERMISSION_DENIED',message:'Cloud Text-to-Speech API has not been used in project 1 before or it is disabled.',details:[{reason:'SERVICE_DISABLED'}]}},{status:403});if(options.hdFails&&init.body.includes('Chirp3'))return new Response('{}',{status:400});return Response.json({audioContent:'AAAA',timepoints:[{markName:'w0',timeSeconds:0},{markName:'w1',timeSeconds:.3}]});}
       const answer=options.answers?options.answers[Math.min(providers.length-1,options.answers.length-1)]:options.bullets??bullets;
       return Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({bullets:answer})}]}}]});
     },
@@ -101,8 +102,41 @@ test('Summary check ignores ordinary words after "room"',()=>{
   assert.equal(JSON.stringify(accuracy.checkSummary(housing,housingBullets.join('\n'))),'[]');
   assert.equal(JSON.stringify(accuracy.checkSummary('Meet in Room 204 on Jan 5 at 3:30 pm. '+housing,'Meet in Room 210 on Jan 5 at 3:30 pm. Move out Dec 18 by 5 PM; checks Dec 19.')),'["Room 210"]');
 });
-test('Listen sends selected voice with escaped SSML and maps word timepoints',async()=>{
-  const f=fixture('app/api/speak/route.ts');const response=await f.run({text:'Hello <world>',voice:'Warm'});assert.equal(response.status,200);const body=await response.json();assert.equal(body.marks[1].start,6);assert.equal(body.marks[1].time,.3);assert.equal(JSON.parse(f.providers[0].init.body).voice.name,'en-US-Neural2-C');assert.ok(!JSON.stringify(body).includes('tts-private'));
+test('Listen uses the Chirp 3 HD voice and returns no marks so the client estimates timing',async()=>{
+  const f=fixture('app/api/speak/route.ts');const response=await f.run({text:'Hello <world>',voice:'Warm'});assert.equal(response.status,200);const body=await response.json();
+  assert.equal(f.providers.length,1);const sent=JSON.parse(f.providers[0].init.body);assert.equal(sent.voice.name,'en-US-Chirp3-HD-Sulafat');assert.equal(sent.input.text,'Hello <world>');assert.equal(sent.input.ssml,undefined);
+  assert.equal(body.marks.length,0);assert.ok(!JSON.stringify(body).includes('tts-private'));
+});
+test('Listen falls back to Neural2 with escaped SSML and maps word timepoints when HD fails',async()=>{
+  const f=fixture('app/api/speak/route.ts',{hdFails:true});const response=await f.run({text:'Hello <world>',voice:'Warm'});assert.equal(response.status,200);const body=await response.json();
+  assert.equal(f.providers.length,2);const sent=JSON.parse(f.providers[1].init.body);assert.equal(sent.voice.name,'en-US-Neural2-C');assert.ok(sent.input.ssml.includes('&lt;world&gt;'));
+  assert.equal(body.marks[1].start,6);assert.equal(body.marks[1].time,.3);
+});
+test('Listen tells the client why the cloud voice failed without leaking the key',async()=>{
+  const f=fixture('app/api/speak/route.ts',{ttsDisabled:true,geminiQuota:true});const response=await f.run();const body=await response.json();
+  assert.equal(response.status,502);assert.equal(f.providers.length,3);assert.equal(body.reason,'RESOURCE_EXHAUSTED');assert.ok(!JSON.stringify(body).includes('tts-private'));
+});
+test('Listen uses Gemini speech with the existing Gemini key when there is no Cloud TTS key',async()=>{
+  const f=fixture('app/api/speak/route.ts',{noCloud:true});const response=await f.run({text:'Hello world',voice:'Clear'});assert.equal(response.status,200);const body=await response.json();
+  assert.equal(f.providers.length,1);assert.match(f.providers[0].url,/gemini-3\.1-flash-tts-preview:generateContent$/);
+  const sent=JSON.parse(f.providers[0].init.body);assert.equal(sent.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,'Iapetus');assert.equal(sent.contents[0].parts[0].text,'Hello world');
+  assert.equal(body.mimeType,'audio/wav');const wav=Buffer.from(body.audioContent,'base64');assert.equal(wav.toString('ascii',0,4),'RIFF');assert.equal(wav.readUInt32LE(24),24000);assert.equal(wav.length,4844);
+  assert.equal(body.marks.length,0);assert.ok(!JSON.stringify(body).includes('gemini-private'));
+});
+test('estimated word marks are ordered, start at each word and fit the audio',()=>{
+  const text='Move out by Dec 18, at 5 PM. Leave your key.';const marks=speech.estimateMarks(text,4);
+  assert.equal(marks.length,11);assert.equal(marks[1].start,5);
+  for(let i=1;i<marks.length;i++)assert.ok(marks[i].time>marks[i-1].time);
+  assert.ok(marks[0].time>=0&&marks.at(-1).time<4);
+  assert.ok(marks[8].time-marks[7].time>marks[2].time-marks[1].time,'pause after a sentence');
+  assert.equal(speech.estimateMarks(text,NaN).length,0);
+});
+test('device voice picker skips novelty voices and prefers natural ones',()=>{
+  const voices=[{name:'Albert',lang:'en-US'},{name:'Bad News',lang:'en-US'},{name:'Bubbles',lang:'en-US'},{name:'Microsoft David Desktop',lang:'en-US'},{name:'Samantha',lang:'en-US'},{name:'Microsoft Aria Online (Natural) - English (United States)',lang:'en-US'},{name:'Thomas',lang:'fr-FR'}];
+  assert.match(speech.pickDeviceVoice(voices,'Calm').name,/Aria/);
+  assert.equal(speech.pickDeviceVoice(voices,'Clear').name,'Samantha');
+  assert.equal(speech.pickDeviceVoice(voices,'Warm').name,'Microsoft David Desktop');
+  assert.equal(speech.pickDeviceVoice([{name:'Thomas',lang:'fr-FR'}],'Calm'),undefined);
 });
 test('Listen validates voices and rejects input that exceeds the actual SSML limit',async()=>{
   const f=fixture('app/api/speak/route.ts');assert.equal((await f.run({text:'Hello',voice:'Injected voice'})).status,400);assert.equal((await f.run({text:'a '.repeat(999),voice:'Calm'})).status,400);assert.equal(f.providers.length,0);

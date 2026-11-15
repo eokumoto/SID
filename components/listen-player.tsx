@@ -2,10 +2,21 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import type { ReaderSettings } from "@/lib/ui-types";
-import { speechChunks, type SpeechMark } from "@/lib/speech";
+import { estimateMarks, pickDeviceVoice, speechChunks, type SpeechMark } from "@/lib/speech";
 import { getSupabase } from "@/lib/supabase/client";
 import { Icon } from "./ui/icon";
 import { LoadingDots } from "./ui/loading-dots";
+
+const VOICE_PROBLEMS: Record<string, string> = {
+  tts_key_missing: "no voice key set",
+  RESOURCE_EXHAUSTED: "daily voice limit reached",
+  SERVICE_DISABLED: "Text-to-Speech API not enabled",
+  BILLING_DISABLED: "billing not enabled",
+  API_KEY_SERVICE_BLOCKED: "key not allowed for Text-to-Speech",
+  API_KEY_INVALID: "invalid voice key",
+  PERMISSION_DENIED: "voice key not allowed",
+  timeout: "timed out",
+};
 
 export function ListenPlayer({ text, settings, preview, onWord, onClose, notify }: {
   text: string; settings: ReaderSettings; preview: boolean;
@@ -41,6 +52,21 @@ export function ListenPlayer({ text, settings, preview, onWord, onClose, notify 
     let request: AbortController | null = null;
     let wordOffset = 0;
     let utterance: SpeechSynthesisUtterance | null = null;
+    let voicesWaited = false;
+    const background = new AbortController();
+    const prefetched = new Map<string, Promise<{ ok: boolean; status: number; body: { audioContent?: unknown; mimeType?: unknown; marks?: unknown; reason?: unknown } | null }>>();
+    const speak = (chunkText: string, token: string, abort?: AbortSignal, prefetch = false) => {
+      const waiting = prefetched.get(chunkText);
+      if (waiting) { if (!prefetch) prefetched.delete(chunkText); return waiting; }
+      const signals = [background.signal, AbortSignal.timeout(40_000), ...(abort ? [abort] : [])];
+      const pending = fetch("/api/speak", {
+        method: "POST", signal: AbortSignal.any(signals),
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ text: chunkText, voice: settings.voice }),
+      }).then(async response => ({ ok: response.ok, status: response.status, body: await response.json().catch(() => null) }));
+      if (prefetch) { prefetched.set(chunkText, pending); pending.catch(() => prefetched.delete(chunkText)); }
+      return pending;
+    };
     let playingChunk: { text: string; offset: number } | null = null;
     let seekPending = false;
     const cleanAudio = () => {
@@ -78,12 +104,19 @@ export function ListenPlayer({ text, settings, preview, onWord, onClose, notify 
           setLoading(false); notify("Audio unavailable on this device"); return;
         }
         browser = true;
+        // Chrome loads its voice list late; wait briefly so we don't fall back to the default robotic voice.
+        if (!window.speechSynthesis.getVoices().length && !voicesWaited) {
+          voicesWaited = true; setLoading(true);
+          const ready = () => { window.speechSynthesis.removeEventListener("voiceschanged", ready); clearTimeout(timer); device(); };
+          const timer = setTimeout(ready, 1000);
+          window.speechSynthesis.addEventListener("voiceschanged", ready);
+          return;
+        }
         const speech = new SpeechSynthesisUtterance(chunk.text);
         utterance = speech;
         speech.rate = rate.current;
-        const voices = window.speechSynthesis.getVoices().filter(voice => /^en\b/i.test(voice.lang));
-        const selected = voices[({ Calm: 0, Clear: 1, Warm: 2 })[settings.voice] % Math.max(voices.length, 1)];
-        if (selected) speech.voice = selected;
+        const selected = pickDeviceVoice(window.speechSynthesis.getVoices(), settings.voice, navigator.language);
+        if (selected) { speech.voice = selected; speech.lang = selected.lang; }
         speech.onstart = () => { if (current()) { setLoading(false); setPlaying(true); } };
         speech.onboundary = event => {
           if (event.name === "word") highlight(event.charIndex, event.charLength || (chunk.text.slice(event.charIndex).match(/^\S+/)?.[0].length ?? 1));
@@ -104,23 +137,31 @@ export function ListenPlayer({ text, settings, preview, onWord, onClose, notify 
         if (!current()) return;
         if (!data.session) { setLoading(false); notify("Please log in again"); return; }
         request = new AbortController();
-        const response = await fetch("/api/speak", {
-          method: "POST", signal: AbortSignal.any([request.signal, AbortSignal.timeout(20_000)]),
-          headers: { Authorization: `Bearer ${data.session.access_token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ text: chunk.text, voice: settings.voice }),
-        });
+        const response = await speak(chunk.text, data.session.access_token, request.signal);
         if (!current()) return;
         if (response.status === 401 || response.status === 403) { setLoading(false); notify("Pro access unavailable. Refresh and try again"); return; }
-        if (!response.ok) throw Error("audio_unavailable");
-        const result = await response.json();
-        if (!current()) return;
+        if (!response.ok) {
+          const reason = typeof response.body?.reason === "string" ? response.body.reason : `HTTP_${response.status}`;
+          console.warn("SID Listen: cloud voice unavailable, using device voice.", reason);
+          notify(`HD voice unavailable (${VOICE_PROBLEMS[reason] ?? reason}). Using your device’s voice`); device();
+          return;
+        }
+        const result = response.body;
+        if (!result || typeof result !== "object") throw Error("audio_unavailable");
+        // Start generating the next chunk now so there is no long gap between clips.
+        const following = chunks[index + 1];
+        if (following) void speak(following.text, data.session.access_token, undefined, true);
         if (typeof result.audioContent !== "string") throw Error("audio_unavailable");
         const bytes = Uint8Array.from(atob(result.audioContent), char => char.charCodeAt(0));
-        audioUrl = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+        audioUrl = URL.createObjectURL(new Blob([bytes], { type: typeof result.mimeType === "string" ? result.mimeType : "audio/mpeg" }));
         const element = new Audio(audioUrl);
         player = element;
         element.playbackRate = rate.current;
-        const marks: SpeechMark[] = Array.isArray(result.marks) ? result.marks : [];
+        let marks: SpeechMark[] = Array.isArray(result.marks) ? result.marks : [];
+        // HD voices return no timepoints; estimate word timing once the length is known.
+        element.onloadedmetadata = () => {
+          if (!marks.length) marks = estimateMarks(chunk.text, element.duration);
+        };
         element.ontimeupdate = () => {
           if (!current() || paused) return;
           const mark = marks.findLast(mark => mark.time <= element.currentTime);
@@ -187,7 +228,7 @@ export function ListenPlayer({ text, settings, preview, onWord, onClose, notify 
     };
     void playChunk(0);
     return () => {
-      cancelled = true; run++; request?.abort(); cleanAudio();
+      cancelled = true; run++; request?.abort(); background.abort(); cleanAudio();
       window.speechSynthesis?.cancel(); toggle.current = null; updateRate.current = null; seek.current = null;
     };
   }, [chunks, text, settings.voice, preview, onWord, notify]);
