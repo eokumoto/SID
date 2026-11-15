@@ -14,7 +14,7 @@ Open [localhost:3000](http://localhost:3000). No credentials are needed to revie
 ## Implemented
 
 - One central Upload button using the native image picker. Desktop drag-and-drop and image pasting are supported; text pasting is not.
-- Cream/navy palette, flat outlined controls and self-hosted OpenDyslexic/Lexend fonts.
+- Cream/navy palette, flat outlined controls and self-hosted reading fonts (Andika, Atkinson Hyperlegible, Lexend, Luciole, OpenDyslexic).
 - Processing, text/photo reader, settings, optional login, history, deletion and error layouts for desktop and mobile.
 - Live font/size/spacing/background settings stored on this device; signed-in accounts also sync `profiles.settings` when Supabase is configured.
 - Read aloud with word-boundary highlighting where supported, section highlighting otherwise. Browser/voice support varies.

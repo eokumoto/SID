@@ -37,7 +37,7 @@ function fixture(route, options={}) {
       return Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({bullets:answer})}]}}]});
     },
   });
-  const run=(body=route.includes('summary')?{documentId:id}:{text:'Hello world',voice:'Calm'},token=true)=>{
+  const run=(body=route.includes('summary')?{documentId:id}:{text:'Hello world',voice:'Emi'},token=true)=>{
     const request=new Request('https://sid.test/api/test',{method:route.includes('account')?'GET':'POST',headers:token?{authorization:'Bearer caller-token'}:{},...(route.includes('account')?{}:{body:JSON.stringify(body)})});
     return route.includes('account')?endpoint.GET(request):endpoint.POST(request);
   };
@@ -103,13 +103,13 @@ test('Summary check ignores ordinary words after "room"',()=>{
   assert.equal(JSON.stringify(accuracy.checkSummary('Meet in Room 204 on Jan 5 at 3:30 pm. '+housing,'Meet in Room 210 on Jan 5 at 3:30 pm. Move out Dec 18 by 5 PM; checks Dec 19.')),'["Room 210"]');
 });
 test('Listen uses the Chirp 3 HD voice and returns no marks so the client estimates timing',async()=>{
-  const f=fixture('app/api/speak/route.ts');const response=await f.run({text:'Hello <world>',voice:'Warm'});assert.equal(response.status,200);const body=await response.json();
-  assert.equal(f.providers.length,1);const sent=JSON.parse(f.providers[0].init.body);assert.equal(sent.voice.name,'en-US-Chirp3-HD-Sulafat');assert.equal(sent.input.text,'Hello <world>');assert.equal(sent.input.ssml,undefined);
+  const f=fixture('app/api/speak/route.ts');const response=await f.run({text:'Hello <world>',voice:'Emi'});assert.equal(response.status,200);const body=await response.json();
+  assert.equal(f.providers.length,1);const sent=JSON.parse(f.providers[0].init.body);assert.equal(sent.voice.name,'en-US-Chirp3-HD-Achernar');assert.equal(sent.input.text,'Hello <world>');assert.equal(sent.input.ssml,undefined);
   assert.equal(body.marks.length,0);assert.ok(!JSON.stringify(body).includes('tts-private'));
 });
 test('Listen falls back to Neural2 with escaped SSML and maps word timepoints when HD fails',async()=>{
-  const f=fixture('app/api/speak/route.ts',{hdFails:true});const response=await f.run({text:'Hello <world>',voice:'Warm'});assert.equal(response.status,200);const body=await response.json();
-  assert.equal(f.providers.length,2);const sent=JSON.parse(f.providers[1].init.body);assert.equal(sent.voice.name,'en-US-Neural2-C');assert.ok(sent.input.ssml.includes('&lt;world&gt;'));
+  const f=fixture('app/api/speak/route.ts',{hdFails:true});const response=await f.run({text:'Hello <world>',voice:'Cameron'});assert.equal(response.status,200);const body=await response.json();
+  assert.equal(f.providers.length,2);const sent=JSON.parse(f.providers[1].init.body);assert.equal(sent.voice.name,'en-US-Neural2-D');assert.ok(sent.input.ssml.includes('&lt;world&gt;'));
   assert.equal(body.marks[1].start,6);assert.equal(body.marks[1].time,.3);
 });
 test('Listen tells the client why the cloud voice failed without leaking the key',async()=>{
@@ -117,7 +117,7 @@ test('Listen tells the client why the cloud voice failed without leaking the key
   assert.equal(response.status,502);assert.equal(f.providers.length,3);assert.equal(body.reason,'RESOURCE_EXHAUSTED');assert.ok(!JSON.stringify(body).includes('tts-private'));
 });
 test('Listen uses Gemini speech with the existing Gemini key when there is no Cloud TTS key',async()=>{
-  const f=fixture('app/api/speak/route.ts',{noCloud:true});const response=await f.run({text:'Hello world',voice:'Clear'});assert.equal(response.status,200);const body=await response.json();
+  const f=fixture('app/api/speak/route.ts',{noCloud:true});const response=await f.run({text:'Hello world',voice:'Cameron'});assert.equal(response.status,200);const body=await response.json();
   assert.equal(f.providers.length,1);assert.match(f.providers[0].url,/gemini-3\.1-flash-tts-preview:generateContent$/);
   const sent=JSON.parse(f.providers[0].init.body);assert.equal(sent.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,'Iapetus');assert.equal(sent.contents[0].parts[0].text,'Hello world');
   assert.equal(body.mimeType,'audio/wav');const wav=Buffer.from(body.audioContent,'base64');assert.equal(wav.toString('ascii',0,4),'RIFF');assert.equal(wav.readUInt32LE(24),24000);assert.equal(wav.length,4844);
@@ -133,11 +133,17 @@ test('estimated word marks are ordered, start at each word and fit the audio',()
 });
 test('device voice picker skips novelty voices and prefers natural ones',()=>{
   const voices=[{name:'Albert',lang:'en-US'},{name:'Bad News',lang:'en-US'},{name:'Bubbles',lang:'en-US'},{name:'Microsoft David Desktop',lang:'en-US'},{name:'Samantha',lang:'en-US'},{name:'Microsoft Aria Online (Natural) - English (United States)',lang:'en-US'},{name:'Thomas',lang:'fr-FR'}];
-  assert.match(speech.pickDeviceVoice(voices,'Calm').name,/Aria/);
-  assert.equal(speech.pickDeviceVoice(voices,'Clear').name,'Samantha');
-  assert.equal(speech.pickDeviceVoice(voices,'Warm').name,'Microsoft David Desktop');
-  assert.equal(speech.pickDeviceVoice([{name:'Thomas',lang:'fr-FR'}],'Calm'),undefined);
+  assert.match(speech.pickDeviceVoice(voices,'Emi').name,/Aria/);
+  assert.equal(speech.pickDeviceVoice(voices,'Cameron').name,'Samantha');
+  assert.equal(speech.pickDeviceVoice([{name:'Thomas',lang:'fr-FR'}],'Emi'),undefined);
 });
 test('Listen validates voices and rejects input that exceeds the actual SSML limit',async()=>{
-  const f=fixture('app/api/speak/route.ts');assert.equal((await f.run({text:'Hello',voice:'Injected voice'})).status,400);assert.equal((await f.run({text:'a '.repeat(999),voice:'Calm'})).status,400);assert.equal(f.providers.length,0);
+  const f=fixture('app/api/speak/route.ts');assert.equal((await f.run({text:'Hello',voice:'Injected voice'})).status,400);assert.equal((await f.run({text:'Hello',voice:'Warm'})).status,400);assert.equal((await f.run({text:'a '.repeat(999),voice:'Emi'})).status,400);assert.equal(f.providers.length,0);
+});
+test('saved settings move to the new fonts and voices',()=>{
+  const settings=load('lib/settings.ts',{'./fonts':load('lib/fonts.ts'),react:{useSyncExternalStore:()=>{}}});
+  const v=settings.validateSettings;
+  assert.equal(v({}).font,'OpenDyslexic');assert.equal(v({}).voice,'Emi');
+  assert.equal(v({font:'Luciole'}).font,'Luciole');assert.equal(v({font:'Arial'}).font,'Atkinson Hyperlegible');assert.equal(v({font:'Comic Sans'}).font,'OpenDyslexic');
+  assert.equal(v({voice:'Calm'}).voice,'Emi');assert.equal(v({voice:'Clear'}).voice,'Cameron');assert.equal(v({voice:'Warm'}).voice,'Emi');assert.equal(v({voice:'Cameron'}).voice,'Cameron');
 });
