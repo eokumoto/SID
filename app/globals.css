@@ -1612,9 +1612,6 @@ legend {
     height: 100%;
     object-fit: cover;
   }
-  .mobile-reader-tools > .icon-button {
-    border-color: var(--text);
-  }
   .photo-view {
     min-height: calc(100svh - var(--navbar-height) - 93px);
     margin-bottom: 14px;
@@ -1730,12 +1727,12 @@ legend {
     max-width: none;
     max-height: 90svh;
     border: 0;
-    border-top: 1px solid var(--text);
+    border-top: 1px solid var(--line);
     border-radius: 0;
   }
   .dialog::backdrop,
   .settings-dialog::backdrop {
-    background: rgb(31 42 68 / 0.45);
+    background: rgb(31 42 68 / 0.5);
   }
   .dialog-content,
   .settings-dialog .dialog-content {
@@ -2013,7 +2010,7 @@ legend {
     max-height: calc(100svh - 48px);
     margin: 0;
     transform: translateY(-50%);
-    border: 1px solid var(--text);
+    border: 1px solid var(--line);
     border-radius: var(--radius);
   }
   .how-to-dialog .dialog-content {
@@ -2121,8 +2118,10 @@ legend {
   .upload-counter { font-size: calc(11px * var(--text-scale, 1)); }
 }
 @media (max-width: 700px) {
-  .navbar { padding: 12px; align-items: flex-start; }
-  .navbar nav { flex: 1; min-width: 0; gap: 6px; }
+  .navbar { padding: 12px; align-items: center; flex-wrap: nowrap; }
+  .navbar nav { flex: 1; min-width: 0; gap: 6px; flex-wrap: nowrap; align-items: center; }
+  .navbar nav > *, .navbar .account-area > button { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; }
+  .navbar .reader-back-slot { align-self: center; }
   .navbar .brand-subtitle { display: none; }
   .navbar .brand-icon { width: 30px; height: 34px; }
   .navbar .brand-icon .icon { width: 22px; height: 22px; }
@@ -2136,7 +2135,10 @@ legend {
   .navbar .nav-item { min-width: 48px; justify-content: center; }
   .reader-top { justify-content: flex-start; }
   .reader-actions { width: 100%; justify-content: flex-start; flex-wrap: nowrap; }
-  .reader-action { flex: 1 1 0; min-width: 0; padding: 9px 8px; gap: 5px; text-align: center; }
+  /* Icon, label and Pro tag always share one line; sizes cap to the viewport so it fits narrow phones. */
+  .reader-action { flex: 1 1 0; min-width: 0; padding: 9px 6px; gap: 4px; flex-wrap: nowrap; white-space: nowrap; overflow-wrap: normal; font-size: min(calc(13px * var(--text-scale, 1)), 3.4vw); }
+  .reader-action .icon { width: 16px; height: 16px; flex-shrink: 0; }
+  .reader-action .pro-tag { padding: 1px 3px; font-size: min(calc(9px * var(--text-scale, 1)), 2.4vw); letter-spacing: 0.04em; }
   .reader-split { flex-direction: column; }
   .reader-side { order: -1; }
   .reader-side .original-photo { display: none; }
@@ -2169,3 +2171,15 @@ legend {
 @keyframes loading-dot-1 { 0% { opacity: 0; } 25%, 100% { opacity: 1; } }
 @keyframes loading-dot-2 { 0%, 25% { opacity: 0; } 50%, 100% { opacity: 1; } }
 @keyframes loading-dot-3 { 0%, 50% { opacity: 0; } 75%, 100% { opacity: 1; } }
+
+/* Narrow phones: nav stays on one row, so the Pro button drops its label (aria-label keeps it named). */
+@media (max-width: 430px) {
+  .navbar .pro-mobile-label { display: none; }
+  .navbar .go-pro { min-width: 48px; padding: 6px; }
+}
+
+/* Pro tag on Listen/Summary: text normally, a star when the text wouldn't fit on one line (set by ReaderView). */
+.reader-action .pro-tag .icon { display: none; width: 12px; height: 12px; }
+.compact-tags .reader-action .pro-tag { display: inline-grid; place-items: center; padding: 2px; }
+.compact-tags .reader-action .pro-tag .icon { display: block; }
+.compact-tags .reader-action .pro-tag-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

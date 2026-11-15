@@ -98,19 +98,25 @@ function TextOverlay({ placement, font }: { placement: OverlayPlacement; font: s
   );
 }
 
+export const SWIPE_DISTANCE = 60;
+
 export function PhotoView({
   url,
   regions = [],
   onNewPhoto,
   onOverlayRemoved,
+  onSwipeBack,
 }: {
   url: string;
   regions?: TextRegion[];
   onNewPhoto?: () => void;
   onOverlayRemoved?: () => void;
+  onSwipeBack?: () => void;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
+  // One-finger touch gesture that started at 100% zoom; a right swipe returns to the text view.
+  const swipe = useRef<{ id: number; x: number; y: number; multi: boolean } | null>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [original, setOriginal] = useState(false);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
@@ -187,6 +193,12 @@ export function PhotoView({
         onPointerDown={(e) => {
           if (e.button !== 0) return;
           e.currentTarget.setPointerCapture(e.pointerId);
+          if (pointers.current.size > 0) {
+            if (swipe.current) swipe.current.multi = true;
+          } else {
+            swipe.current = e.pointerType === "touch" && transform.scale <= 1
+              ? { id: e.pointerId, x: e.clientX, y: e.clientY, multi: false } : null;
+          }
           pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
         }}
         onPointerMove={(e) => {
@@ -211,7 +223,15 @@ export function PhotoView({
               y: t.y + e.clientY - previous.y,
             }));
         }}
-        onPointerUp={(e) => pointers.current.delete(e.pointerId)}
+        onPointerUp={(e) => {
+          pointers.current.delete(e.pointerId);
+          const gesture = swipe.current;
+          if (!gesture || gesture.id !== e.pointerId) return;
+          swipe.current = null;
+          const dx = e.clientX - gesture.x;
+          const dy = e.clientY - gesture.y;
+          if (!gesture.multi && dx > SWIPE_DISTANCE && Math.abs(dy) < dx * 0.5) onSwipeBack?.();
+        }}
         onPointerCancel={(e) => pointers.current.delete(e.pointerId)}
         onLostPointerCapture={(e) => pointers.current.delete(e.pointerId)}
       >

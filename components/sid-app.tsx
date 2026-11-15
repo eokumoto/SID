@@ -728,6 +728,23 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     dark: "#22232B",
     navy: "#1F2A44",
   }[settings.background];
+  // Match the phone's status/browser bar to the navbar (page color with 8% accent, as in globals.css).
+  useEffect(() => {
+    const accent = settings.background === "dark" || settings.background === "navy" ? "#F6D88A" : "#2F4B7C";
+    const mix = (a: string, b: string, i: number) =>
+      Math.round(parseInt(a.slice(1 + i * 2, 3 + i * 2), 16) * 0.92 + parseInt(b.slice(1 + i * 2, 3 + i * 2), 16) * 0.08);
+    const navbarColor = `rgb(${[0, 1, 2].map((i) => mix(background, accent, i)).join(" ")})`;
+    const root = document.documentElement;
+    root.style.backgroundColor = background;
+    root.style.colorScheme = settings.background === "dark" || settings.background === "navy" ? "dark" : "light";
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = "theme-color";
+      document.head.appendChild(meta);
+    }
+    meta.content = navbarColor;
+  }, [background, settings.background]);
   const spacing = {
     Tight: { leading: 1.6, tracking: "0em", wordSpacing: "0em" },
     "Slightly tight": {
@@ -910,7 +927,6 @@ export function SidApp({ preview = "" }: { preview?: string }) {
                 <Icon name="upload" />
                 Select image
               </span>
-              <span className="upload-format">JPG, PNG, HEIC and more</span>
               </>}
             </button>
             {outOfUploads && !pro && <button type="button" className="button" onClick={openPro}><Icon name="star" />Get 150 a day with Pro</button>}
