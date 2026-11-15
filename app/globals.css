@@ -2261,6 +2261,9 @@ legend {
 }
 /* The avatar's peach fill stays light in every theme, so its letter stays blue for contrast; the ring follows the theme accent. */
 .sid-app .avatar { color: var(--blue); }
+/* In dark themes the letter matches the gold ring. */
+.theme-dark .avatar,
+.theme-navy .avatar { color: var(--accent); }
 
 /* Mobile: the back arrow replaces the logo while reading; the logo slides back when you leave the reader. */
 @media (max-width: 700px) {
