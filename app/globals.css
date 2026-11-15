@@ -2273,6 +2273,19 @@ legend {
     pointer-events: none;
     transition: max-width 220ms ease, opacity 160ms ease, margin 220ms ease, visibility 0s 220ms;
   }
+  /* The arrow slides in from where the logo was with the logo's own timing: the same distance and
+     ease curve, 220ms for the slide and 160ms for the fade. */
+  .navbar.reader-open .reader-back-button {
+    animation: back-arrow-slide 220ms ease both, back-arrow-fade 160ms ease both;
+  }
+}
+@keyframes back-arrow-slide {
+  from { transform: translateX(28px); }
+  to { transform: none; }
+}
+@keyframes back-arrow-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Toggle box stacked (ReaderView adds .stacked when Listen/Summary wrap): rows share one width and the
