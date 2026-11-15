@@ -1,6 +1,6 @@
 // Conservative checks for common changes, not proof that meaning was preserved.
 // Exact tokens deliberately retain years, signs, units, currency and URL case.
-const protectedValue = /https?:\/\/[^\s<>]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b|\b\d{1,2}:\d{2}(?:\s*[ap]m)?\b|\b(?:Room|Bldg)\s+[\w-]+|\b[A-Z]+-\d+\b|[$€£]?[+-]?\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:%|mg|kg|ml|cm|km|mm|g|l|m|hours?|minutes?|[ap]m)\b|%)?/gi;
+const protectedValue = /https?:\/\/[^\s<>]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b|\b\d{1,2}:\d{2}(?:\s*[ap]m)?\b|\b(?:Room|Bldg)\s+[A-Z]?\d[\w-]*|\b[A-Z]+-\d+\b|[$€£]?[+-]?\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:%|mg|kg|ml|cm|km|mm|g|l|m|hours?|minutes?|[ap]m)\b|%)?/gi;
 
 export type AccuracyFlag = { original: string; reason: string; question: string; source: "accuracy" };
 
@@ -32,4 +32,26 @@ export function checkAccuracy(source: string, rewrite: string, keyTerms: string[
     }
   }
   return flags;
+}
+
+const datePattern = /^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d/i;
+// Dates, times and amounts of money are the details a reader acts on, so a summary must keep them.
+const isKeyDetail = (value: string) =>
+  datePattern.test(value) || /[$€£]|\d:\d{2}|\d\/\d|\d{4}-\d{2}|\d\s*[ap]m$/i.test(value);
+const MAX_REQUIRED_DETAILS = 8;
+
+// A summary drops sentences by design, so occurrence counts cannot match the source. Instead:
+// every protected value in the summary must appear in the source (nothing invented or changed),
+// and the source's dates, times and prices must each appear in the summary at least once.
+// Documents with too many key details to fit in 3-5 bullets skip the second rule.
+export function checkSummary(source: string, summary: string): string[] {
+  const problems: string[] = [];
+  for (const value of inventory(summary).keys()) {
+    if (!containsTerm(source, value)) problems.push(value);
+  }
+  const required = [...inventory(source).keys()].filter(isKeyDetail);
+  if (required.length <= MAX_REQUIRED_DETAILS) {
+    for (const value of required) if (!containsTerm(summary, value)) problems.push(value);
+  }
+  return [...new Set(problems)];
 }
