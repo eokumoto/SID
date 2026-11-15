@@ -17,7 +17,8 @@
     "next": "^16.4.6",
     "open-dyslexic": "^1.0.3",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "stripe": "^23.1.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.16",
