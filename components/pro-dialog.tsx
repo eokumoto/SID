@@ -59,7 +59,7 @@ export function ProDialog({ onClose, signedIn, preview, onSignIn }: {
         <tr><th scope="row">Uploads</th><td>10/day</td><td>150/day</td></tr>
         {[
           ["Clear-font reader", true], ["Settings (font, size, color)", true],
-          ["Listen (read aloud)", false], ["Voice and speed", false], ["Summary", false], ["Saved history", true],
+          ["Listen (read aloud)", false], ["Voice and speed", false], ["Saved history", true],
         ].map(([label, free]) => <tr key={String(label)}><th scope="row">{label}</th><td>{free ? <><Icon name="check" /><span className="sr-only">Included</span></> : <span aria-label="Not included">—</span>}</td><td><Icon name="check" /><span className="sr-only">Included</span></td></tr>)}
       </tbody>
     </table>

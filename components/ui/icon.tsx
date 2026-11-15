@@ -21,7 +21,7 @@ export type IconName =
   | "mail"
   | "book"
   | "star"
-  | "summary"
+  | "copy"
   | "pause"
   | "play"
   | "warning"
@@ -31,7 +31,7 @@ export type IconName =
 const paths: Record<IconName, React.ReactNode> = {
   person: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
   star: <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z" />,
-  summary: <path d="M4 6h16M4 10h16M4 14h10M4 18h7" />,
+  copy: <><rect x="9" y="9" width="11" height="11" rx="1" /><path d="M5 15V5a1 1 0 0 1 1-1h10" /></>,
   pause: <path d="M8 5v14M16 5v14" />,
   play: <path d="m9 5 11 7-11 7z" />,
   warning: <><circle cx="12" cy="12" r="9" /><path d="M12 6v7m0 3v1" /></>,
