@@ -1,15 +1,16 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { DEFAULT_FONT, READER_FONTS } from "./fonts";
 import type { ReaderSettings } from "./ui-types";
 
 const key = "sid.reader.settings";
 const defaults: ReaderSettings = {
-  font: "OpenDyslexic",
+  font: DEFAULT_FONT,
   size: 21,
   spacing: "Normal",
   background: "cream",
-  voice: "Calm",
+  voice: "Emi",
   speed: 1,
 };
 const initial = JSON.stringify(defaults);
@@ -22,11 +23,15 @@ export function validateSettings(value: unknown): ReaderSettings {
       ? (value as Partial<ReaderSettings>)
       : {};
   return {
-    voice: ["Calm", "Clear", "Warm"].includes(v.voice ?? "") ? v.voice! : defaults.voice,
+    // Clear (Iapetus) became Cameron; Calm (Achernar) and the retired Warm become Emi.
+    voice: v.voice === "Cameron" || (v.voice as string) === "Clear" ? "Cameron" : "Emi",
     speed: typeof v.speed === "number" && Number.isFinite(v.speed) ? Math.min(2, Math.max(.25, v.speed)) : defaults.speed,
-    font: ["OpenDyslexic", "Lexend", "Arial"].includes(v.font ?? "")
+    // Arial was retired; its plain-sans readers move to Atkinson Hyperlegible.
+    font: (READER_FONTS as readonly string[]).includes(v.font ?? "")
       ? v.font!
-      : defaults.font,
+      : (v.font as string) === "Arial"
+        ? "Atkinson Hyperlegible"
+        : defaults.font,
     size:
       typeof v.size === "number" && Number.isFinite(v.size)
         ? Math.min(30, Math.max(14, v.size))

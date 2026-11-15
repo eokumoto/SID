@@ -1,5 +1,6 @@
+import type { ReaderFont } from "./fonts";
 export type ReaderSettings = {
-  font: "OpenDyslexic" | "Lexend" | "Arial";
+  font: ReaderFont;
   size: number;
   spacing:
     | "Tight"

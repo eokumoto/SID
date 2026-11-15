@@ -1,6 +1,8 @@
 import type { ReaderSettings } from "@/lib/ui-types";
 import { Dialog } from "./ui/dialog";
 import { Icon } from "./ui/icon";
+import { FontSelect } from "./font-select";
+import { SPEECH_VOICES, VOICE_LANGUAGE, type Voice } from "@/lib/speech";
 
 export function SettingsPanel({
   settings,
@@ -26,20 +28,11 @@ export function SettingsPanel({
         <div className="reading-settings">
           <h2><Icon name="settings" />Settings</h2>
         <fieldset>
-          <legend>Font</legend>
-          <div className="segment font-segment">
-            {(["OpenDyslexic", "Lexend", "Arial"] as const).map((font) => (
-              <button
-                type="button"
-                key={font}
-                aria-pressed={settings.font === font}
-                style={{ fontFamily: font }}
-                onClick={() => onChange({ ...settings, font })}
-              >
-                {font}
-              </button>
-            ))}
-          </div>
+          <legend id="font-label">Font</legend>
+          <FontSelect
+            value={settings.font}
+            onChange={(font) => onChange({ ...settings, font })}
+          />
         </fieldset>
         <fieldset>
           <legend>Size</legend>
@@ -127,7 +120,7 @@ export function SettingsPanel({
           <fieldset disabled={!pro}>
             <legend>Voice</legend>
             <div className="segment voice-segment">
-              {(["Calm", "Clear", "Warm"] as const).map(voice => <button type="button" key={voice} aria-pressed={settings.voice === voice} onClick={() => onChange({ ...settings, voice })}>{voice}</button>)}
+              {(Object.keys(SPEECH_VOICES) as Voice[]).map(voice => <button type="button" key={voice} aria-pressed={settings.voice === voice} onClick={() => onChange({ ...settings, voice })}>{voice}<span className="voice-language" lang="en">{VOICE_LANGUAGE}</span></button>)}
             </div>
           </fieldset>
           <fieldset disabled={!pro}>

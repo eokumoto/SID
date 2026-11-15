@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const body = JSON.parse(raw);
     if (!body || Array.isArray(body) || typeof body !== "object" || Object.keys(body).some(k => !["text", "voice"].includes(k)) ||
       typeof body.text !== "string" || !body.text.trim() || body.text.length > 2000) return reply({ error: "bad_request" }, 400);
-    const voice = body.voice ?? "Calm";
+    const voice = body.voice ?? "Emi";
     if (typeof voice !== "string" || !Object.hasOwn(SPEECH_VOICES, voice)) return reply({ error: "bad_request" }, 400);
     const input = speechInput(body.text);
     if (new TextEncoder().encode(input.ssml).length > 4800) return reply({ error: "bad_request" }, 400);

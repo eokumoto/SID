@@ -1,4 +1,4 @@
-export type Voice = "Calm" | "Clear" | "Warm";
+export type Voice = "Emi" | "Cameron";
 export type SpeechMark = { start: number; length: number; time: number };
 
 // Pro voices. `hd` is a Chirp 3: HD voice (Google's most natural voices, same
@@ -8,10 +8,11 @@ export type SpeechMark = { start: number; length: number; time: number };
 // `gemini` is the same voice through Gemini speech generation (GEMINI_API_KEY),
 // used when there is no Cloud TTS key.
 export const SPEECH_VOICES: Record<Voice, { hd: string; fallback: string; gemini: string }> = {
-  Calm: { hd: "en-US-Chirp3-HD-Achernar", fallback: "en-US-Neural2-F", gemini: "Achernar" },
-  Clear: { hd: "en-US-Chirp3-HD-Iapetus", fallback: "en-US-Neural2-D", gemini: "Iapetus" },
-  Warm: { hd: "en-US-Chirp3-HD-Sulafat", fallback: "en-US-Neural2-C", gemini: "Sulafat" },
+  Emi: { hd: "en-US-Chirp3-HD-Achernar", fallback: "en-US-Neural2-F", gemini: "Achernar" },
+  Cameron: { hd: "en-US-Chirp3-HD-Iapetus", fallback: "en-US-Neural2-D", gemini: "Iapetus" },
 };
+// Both voices are US English; the Settings buttons show this code.
+export const VOICE_LANGUAGE = "en-US";
 
 const escapeXml = (text: string) => text.replace(/[&<>"']/g, char =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]!);
@@ -100,7 +101,7 @@ function voiceScore(voice: DeviceVoice, language: string) {
 }
 
 // Rank the device's English voices best first, without the novelty voices, and
-// give Calm, Clear and Warm the top three distinct ones.
+// give Emi and Cameron the top two distinct ones.
 export function pickDeviceVoice<T extends DeviceVoice>(voices: T[], choice: Voice, language = "en-US"): T | undefined {
   const english = voices.filter(voice => /^en\b/i.test(voice.lang));
   const usable = english.filter(voice => !NOVELTY.test(voice.name));
@@ -109,6 +110,6 @@ export function pickDeviceVoice<T extends DeviceVoice>(voices: T[], choice: Voic
     .sort((a, b) => b.score - a.score || a.order - b.order)
     .map(entry => entry.voice);
   if (!ranked.length) return undefined;
-  const slot = ({ Calm: 0, Clear: 1, Warm: 2 })[choice];
+  const slot = ({ Emi: 0, Cameron: 1 })[choice];
   return ranked[Math.min(slot, ranked.length - 1)];
 }

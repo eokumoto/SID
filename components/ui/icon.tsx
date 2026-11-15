@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 
 export type IconName =
   | "upload"
+  | "chevron-down"
   | "document"
   | "settings"
   | "history"
@@ -93,6 +94,7 @@ const paths: Record<IconName, React.ReactNode> = {
     </>
   ),
   check: <path d="m5 12 4 4L19 6" />,
+  "chevron-down": <path d="m6 9 6 6 6-6" />,
   minus: <path d="M5 12h14" />,
   plus: <path d="M5 12h14M12 5v14" />,
   logout: (

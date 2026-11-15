@@ -27,8 +27,8 @@ test('Listen on device voice picks a good voice, highlights, and keeps controls'
  await page.getByRole('button',{name:'Resume reading',exact:true}).click();
  await page.getByRole('button',{name:'Settings',exact:true}).click();
  expect(await page.getByLabel('Reading speed',{exact:true}).isEnabled()).toBe(true);
- await page.getByRole('button',{name:'Warm',exact:true}).click();
+ await page.getByRole('button',{name:'Cameron en-US',exact:true}).click();
  await page.waitForTimeout(400);
- expect(await page.evaluate(()=>window.__voices.at(-1))).toBe('Daniel');
+ expect(await page.evaluate(()=>window.__voices.at(-1))).toBe('Samantha');
  expect(errors).toEqual([]);
 });

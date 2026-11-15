@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { fontStack } from "@/lib/fonts";
 import type { CSSProperties } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
@@ -787,12 +788,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     Wide: { leading: 2.1, tracking: ".14em", wordSpacing: ".4em" },
   }[settings.spacing];
   const style = {
-    fontFamily:
-      settings.font === "OpenDyslexic"
-        ? '"OpenDyslexic", "Lexend", system-ui'
-        : settings.font === "Lexend"
-          ? '"Lexend", system-ui'
-          : "Arial, sans-serif",
+    fontFamily: fontStack(settings.font),
     "--page-color": background,
     // Text panels use the same subtle raised surface as controls, cards, and dialogs.
     "--panel-color": "var(--surface-raised)",

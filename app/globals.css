@@ -1,8 +1,26 @@
 @import "tailwindcss" source(none);
+@import "@fontsource/andika/latin-400.css";
+@import "@fontsource/andika/latin-700.css";
+@import "@fontsource/atkinson-hyperlegible/latin-400.css";
+@import "@fontsource/atkinson-hyperlegible/latin-700.css";
 @import "@fontsource/lexend/latin-400.css";
 @import "@fontsource/lexend/latin-500.css";
 @import "@fontsource/lexend/latin-600.css";
 
+@font-face {
+  font-family: "Luciole";
+  src: url("./fonts/luciole/Luciole-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Luciole";
+  src: url("./fonts/luciole/Luciole-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 @font-face {
   font-family: "OpenDyslexic";
   src: url("../node_modules/open-dyslexic/woff/OpenDyslexic-Regular.woff")
@@ -1242,12 +1260,87 @@ legend {
 .settings-fields .segment {
   width: 100%;
 }
-.font-segment {
-  flex-direction: column;
+.font-select {
+  position: relative;
 }
-.font-segment button {
-  font-size: calc(11px * var(--text-scale, 1));
-  padding: 8px 5px;
+.font-select-button {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: calc(15px * var(--text-scale, 1));
+  text-align: left;
+}
+.font-select-button[aria-expanded="true"] {
+  border-color: var(--accent);
+}
+.font-select-button svg {
+  flex: none;
+  transition: transform 0.15s;
+}
+.font-select-button[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.font-default {
+  margin-left: 10px;
+  font-family: "OpenDyslexic", system-ui, sans-serif;
+  font-size: 0.7em;
+  color: var(--muted);
+}
+.font-options {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--page-color);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 16%, transparent);
+}
+.font-options:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.font-options li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 8px 12px;
+  font-size: calc(15px * var(--text-scale, 1));
+  color: var(--text);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.font-options li[data-active] {
+  background: var(--surface-raised);
+}
+.font-options li[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.font-options li[aria-selected="true"] .font-default {
+  color: inherit;
+  opacity: 0.8;
+}
+.voice-language {
+  margin-left: 8px;
+  padding: 1px 6px;
+  font-size: 0.78em;
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  opacity: 0.75;
 }
 .size-control {
   display: flex;
@@ -1740,9 +1833,6 @@ legend {
   }
   .settings-dialog.dialog-closing {
     animation-name: settings-exit-mobile;
-  }
-  .font-segment button {
-    font-size: calc(11px * var(--text-scale, 1));
   }
   .delete-dialog .dialog-content {
     padding-top: 38px;

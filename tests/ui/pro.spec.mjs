@@ -8,7 +8,7 @@ for (const width of [1440, 720, 390, 320]) test(`Pro screens at ${width}px`, asy
   class TestUtterance { constructor(text) { this.text=text; } }
   Object.defineProperty(window,'SpeechSynthesisUtterance',{value:TestUtterance,configurable:true});
   let timer=null,cursor=0,paused=false;
-  const engine={speaking:false,getVoices:()=>[{lang:'en-US',name:'Calm'},{lang:'en-US',name:'Clear'},{lang:'en-US',name:'Warm'}],
+  const engine={speaking:false,getVoices:()=>[{lang:'en-US',name:'Emi'},{lang:'en-US',name:'Cameron'}],
    cancel(){clearInterval(timer);engine.speaking=false;},pause(){paused=true;},resume(){paused=false;},
    speak(u){clearInterval(timer);cursor=0;paused=false;engine.speaking=true;queueMicrotask(()=>u.onstart?.({}));const words=[...u.text.matchAll(/\S+/g)];timer=setInterval(()=>{if(paused)return;const word=words[cursor++];if(!word){clearInterval(timer);engine.speaking=false;u.onend?.({});}else u.onboundary?.({name:'word',charIndex:word.index,charLength:word[0].length});},120);}};
   Object.defineProperty(window,'speechSynthesis',{value:engine,configurable:true});
@@ -63,8 +63,8 @@ for (const width of [1440, 720, 390, 320]) test(`Pro screens at ${width}px`, asy
  assert(await page.getByRole('button',{name:'Pause reading',exact:true}).isVisible(),'resume works');
  await page.getByRole('button',{name:'Settings',exact:true}).click();
  assert(await page.getByLabel('Reading speed',{exact:true}).isEnabled(),'Pro speed enabled');
- await page.getByRole('button',{name:'Warm',exact:true}).click();
- assert(await page.getByRole('button',{name:'Warm',exact:true}).getAttribute('aria-pressed')==='true','voice setting persists');
+ await page.getByRole('button',{name:'Cameron en-US',exact:true}).click();
+ assert(await page.getByRole('button',{name:'Cameron en-US',exact:true}).getAttribute('aria-pressed')==='true','voice setting persists');
  await page.getByRole('button',{name:'Close settings',exact:true}).click();
  await page.getByRole('dialog').waitFor({state:'detached'});
  await page.getByRole('button',{name:'Close Listen',exact:true}).click();
