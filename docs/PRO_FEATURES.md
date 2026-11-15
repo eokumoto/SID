@@ -50,7 +50,6 @@ All preview states are visibly labeled Sample and do not grant real Pro access o
 Run `npm test`, `npm run lint`, `npm run typecheck`, and `npm run build`.
 The tests use local mocks/PGlite, not hosted data. Live Stripe purchases are intentionally unavailable. Hosted migrations, entitlements, Google voices, and Gemini summaries must be checked separately after configuration.
 
-
 The Pro branch also includes main commits `a8b484b` and `9918cad`: the updated SID logo and Back navigation, upright image preparation, and Vision-assisted photo geometry. Gemini remains the authoritative transcription.
 
 Local verification of the combined version passed 71 unit/database tests, 9 browser tests across desktop/tablet/phone sizes, lint, typecheck, and a webpack production build. Providers and hosted Supabase were mocked; no production migrations, billing changes, push, or deployment were performed.
