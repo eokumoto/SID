@@ -6,6 +6,7 @@ import { getSupabase } from "@/lib/supabase/client";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { Dialog } from "./ui/dialog";
 import { Icon } from "./ui/icon";
+import { LoadingDots } from "./ui/loading-dots";
 
 type Step = "email" | "login" | "signup" | "forgot" | "reset" | "sent";
 
@@ -269,7 +270,7 @@ export function AuthDialog({
               disabled={busy}
             />
             <button className="button" type="submit" disabled={busy}>
-              {busy ? "Checking" : "Continue with email"}
+              {busy ? <>Checking<LoadingDots /></> : "Continue with email"}
             </button>
           </form>
         </>

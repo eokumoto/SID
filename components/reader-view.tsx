@@ -5,6 +5,7 @@ import type { ReaderSettings, Scan } from "@/lib/ui-types";
 import { summaryUnavailable } from "@/lib/pro";
 import { getSupabase } from "@/lib/supabase/client";
 import { Icon } from "./ui/icon";
+import { LoadingDots } from "./ui/loading-dots";
 import { ScanImage } from "./ui/scan-image";
 import { PhotoView } from "./photo-view";
 import { ListenPlayer } from "./listen-player";
@@ -96,7 +97,7 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
         <div className="reader-side">
           {summaryOpen && <aside className={`summary-panel ${unavailable ? "summary-unavailable" : ""}`} aria-label="Summary" aria-busy={summaryLoading}>
             <h2>Summary</h2>
-            {summaryLoading ? <p role="status">Creating summary…</p> : bullets && !unavailable ? <><ul>{bullets.map((bullet, i) => <li key={i}>{bullet}</li>)}</ul><p className="summary-note">Full text stays visible.</p></> : <p role="status">{unavailable || summaryMessage || "Select Summary to get started."}</p>}
+            {summaryLoading ? <p role="status">Creating summary<LoadingDots /></p> : bullets && !unavailable ? <><ul>{bullets.map((bullet, i) => <li key={i}>{bullet}</li>)}</ul><p className="summary-note">Full text stays visible.</p></> : <p role="status">{unavailable || summaryMessage || "Select Summary to get started."}</p>}
           </aside>}
           <button type="button" className="original-photo" aria-label="Open original photo" title="Open photo" onClick={openPhoto}>
             {scan.photoUrl ? <ScanImage src={scan.photoUrl} alt="Original scan" /> : <span className="missing-photo"><Icon name="photo" />Photo unavailable</span>}

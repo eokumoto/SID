@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import type { Scan } from "@/lib/ui-types";
 import { Icon } from "./ui/icon";
+import { LoadingDots } from "./ui/loading-dots";
 import { ScanImage } from "./ui/scan-image";
 
 function HistoryRow({
@@ -60,7 +61,7 @@ function HistoryRow({
                 Didn’t work
               </span>
             ) : scan.status === "queued" || scan.status === "processing" ? (
-              <span><Icon name="history" /> {scan.status === "queued" ? "Queued" : "Reading"}</span>
+              <span><Icon name="history" /> {scan.status === "queued" ? "Queued" : <>Reading<LoadingDots /></>}</span>
             ) : (
               <time dateTime={scan.createdAt}>
                 {scan.id === "sample-flu"
@@ -116,7 +117,7 @@ export function HistoryList({
     return (
       <div className="center-stage">
         <Icon name="history" className="state-icon muted-icon" />
-        <p role="status">Loading</p>
+        <p role="status">Loading<LoadingDots /></p>
       </div>
     );
   if (error)

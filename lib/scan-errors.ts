@@ -24,7 +24,7 @@ const messages: Record<ScanErrorCode, ScanErrorCopy> = {
   no_text: { title: "No words found", detail: "Try a photo of a menu, sign or page", canRetry: false },
   blurry: { title: "Too blurry", detail: "Hold steady and try again", canRetry: false },
   too_big: { title: "Photo too big", detail: "Try a smaller photo", canRetry: false },
-  wrong_type: { title: "Can’t open this file", detail: "Use a JPG, PNG or HEIC photo", canRetry: false },
+  wrong_type: { title: "Can’t open this file", detail: "Use a photo, like a JPG, PNG or HEIC", canRetry: false },
   busy: { title: "Taking too long", detail: "Try again in a moment", canRetry: true },
   timeout: { title: "Taking too long", detail: "Try again in a moment", canRetry: true },
   network: { title: "No connection", detail: "Check your internet", canRetry: true },

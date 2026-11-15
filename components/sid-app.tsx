@@ -14,6 +14,7 @@ import { useAllowance } from "@/lib/use-allowance";
 import { ProDialog } from "./pro-dialog";
 import type { ReaderSettings, Scan } from "@/lib/ui-types";
 import { Icon } from "./ui/icon";
+import { LoadingDots } from "./ui/loading-dots";
 import { ScanImage } from "./ui/scan-image";
 import { Dialog } from "./ui/dialog";
 import { SettingsPanel } from "./settings-panel";
@@ -33,6 +34,8 @@ import {
 type Screen = "home" | "processing" | "reader" | "history" | "error";
 type ReaderReturnScreen = "home" | "history";
 const MAX_UPRIGHT_IMAGE_DIMENSION = 2200;
+const UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 async function prepareUprightImage(file: File) {
   if (!("createImageBitmap" in window)) return file;
@@ -497,13 +500,10 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       setNotice("Sample preview only");
       return;
     }
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    // Accept anything the browser can decode (HEIC, AVIF, GIF, ...): it is re-encoded to JPEG below.
+    // Some browsers leave HEIC's type empty, so fall back to the extension.
+    if (!file.type.startsWith("image/") && !/\.(heic|heif|avif)$/i.test(file.name)) {
       setErrorCode("wrong_type");
-      setScreen("error");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorCode("too_big");
       setScreen("error");
       return;
     }
@@ -517,6 +517,13 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     setScreen("processing");
     const preparedFile = await prepareUprightImage(file);
     if (run !== workRun.current) return;
+    // Validate the re-encoded file, which is what is actually uploaded. If the browser
+    // couldn't decode the original, it comes back unchanged and must already be a supported type.
+    if (!UPLOAD_TYPES.includes(preparedFile.type) || preparedFile.size > MAX_UPLOAD_BYTES) {
+      setErrorCode(UPLOAD_TYPES.includes(preparedFile.type) ? "too_big" : "wrong_type");
+      setScreen("error");
+      return;
+    }
     if (localPhoto.current) URL.revokeObjectURL(localPhoto.current);
     const url = URL.createObjectURL(preparedFile);
     localPhoto.current = url;
@@ -794,7 +801,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
         <nav aria-label="Main navigation">
           <span className={`upload-counter ${outOfUploads ? "exhausted" : ""} ${pro ? "pro-counter" : ""}`} aria-live="polite" aria-atomic="true" title={allowance ? `Resets ${new Date(allowance.resetsAt).toLocaleString()}` : undefined}>
             {outOfUploads ? <Icon name="warning" /> : pro ? <Icon name="star" /> : null}
-            <span className="counter-desktop">{outOfUploads ? "No uploads left" : remaining !== undefined ? `${pro ? "Pro · " : ""}${remaining} uploads left` : allowanceStatus === "error" ? "Uploads unavailable" : "Checking uploads…"}</span>
+            <span className="counter-desktop">{outOfUploads ? "No uploads left" : remaining !== undefined ? `${pro ? "Pro · " : ""}${remaining} uploads left` : allowanceStatus === "error" ? "Uploads unavailable" : <>Checking uploads<LoadingDots /></>}</span>
             <span className="counter-mobile">{remaining !== undefined ? `${remaining}${pro ? "" : " left"}` : "—"}</span>
           </span>
           {!pro && <button type="button" className="go-pro" aria-label="Go Pro" onClick={openPro}><Icon name="star" /><span className="pro-desktop-label">Go Pro</span><span className="pro-mobile-label">Pro</span></button>}
@@ -873,7 +880,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       <input
         ref={picker}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         hidden
         aria-label="Upload image"
         onChange={(event) => {
@@ -892,9 +899,9 @@ export function SidApp({ preview = "" }: { preview?: string }) {
               onClick={() => picker.current?.click()}
             >
               <Icon name="photo" />
-              <span className="upload-drop-title">{outOfUploads ? "No uploads left today" : "Drag an image here"}</span>
+              <span className={`upload-drop-title ${outOfUploads ? "" : "drag-only"}`}>{outOfUploads ? "No uploads left today" : "Drag an image here"}</span>
               {outOfUploads ? <span className="upload-format">{pro ? 150 : 10} more at midnight UTC</span> : <>
-              <span className="upload-or" aria-hidden="true">
+              <span className="upload-or drag-only" aria-hidden="true">
                 <i />
                 <b>or</b>
                 <i />
@@ -903,7 +910,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
                 <Icon name="upload" />
                 Select image
               </span>
-              <span className="upload-format">JPG, PNG or WebP</span>
+              <span className="upload-format">JPG, PNG, HEIC and more</span>
               </>}
             </button>
             {outOfUploads && !pro && <button type="button" className="button" onClick={openPro}><Icon name="star" />Get 150 a day with Pro</button>}
@@ -917,7 +924,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
               className="how-to-trigger"
               onClick={() => setModal("help")}
             >
-              <span aria-hidden="true">?</span>
+              <Icon name="help" />
               How to use
             </button>
           </section>
@@ -936,7 +943,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
               <div className="scan-beam" aria-hidden="true" />
             </div>
             <p role="status" aria-live="polite">
-              Loading
+              Loading<LoadingDots />
             </p>
             {isPreview && <span className="sample-label">Sample</span>}
           </section>

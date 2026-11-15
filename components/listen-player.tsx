@@ -5,6 +5,7 @@ import type { ReaderSettings } from "@/lib/ui-types";
 import { speechChunks, type SpeechMark } from "@/lib/speech";
 import { getSupabase } from "@/lib/supabase/client";
 import { Icon } from "./ui/icon";
+import { LoadingDots } from "./ui/loading-dots";
 
 export function ListenPlayer({ text, settings, preview, onWord, onClose, notify }: {
   text: string; settings: ReaderSettings; preview: boolean;
@@ -159,7 +160,7 @@ export function ListenPlayer({ text, settings, preview, onWord, onClose, notify 
       <Icon name={playing ? "pause" : "play"} />
     </button>
     <progress max="100" value={progress} aria-label="Reading progress" />
-    {loading && <span role="status" className="player-status">Loading…</span>}
+    {loading && <span role="status" className="player-status">Loading<LoadingDots /></span>}
     <button type="button" className="icon-button player-close" aria-label="Close Listen" onClick={onClose}><Icon name="close" /></button>
   </div>;
 }

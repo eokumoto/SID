@@ -25,13 +25,15 @@ export type IconName =
   | "pause"
   | "play"
   | "warning"
-  | "back";
+  | "back"
+  | "help";
 const paths: Record<IconName, React.ReactNode> = {
   star: <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z" />,
   summary: <path d="M4 6h16M4 10h16M4 14h10M4 18h7" />,
   pause: <path d="M8 5v14M16 5v14" />,
   play: <path d="m9 5 11 7-11 7z" />,
   warning: <><circle cx="12" cy="12" r="9" /><path d="M12 6v7m0 3v1" /></>,
+  help: <><circle cx="12" cy="12" r="10" /><path d="M9.2 9.7a2.9 2.9 0 1 1 4.3 2.5c-.9.5-1.5 1.1-1.5 2.1v.4M12 17.6v.1" /></>,
   document: (
     <>
       <path d="M5 3h10l4 4v14H5zM15 3v4h4M8 10h7M8 14h5M8 18h7" />

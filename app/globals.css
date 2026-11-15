@@ -34,6 +34,7 @@
   --radius: 3px;
   --navbar-height: 104px;
   --brand-mark: var(--blue);
+  --accent: var(--blue);
   --text: var(--ink);
   --page-color: var(--cream);
   color-scheme: light;
@@ -73,7 +74,7 @@ input:focus-visible {
   outline-offset: 4px;
 }
 a {
-  color: var(--blue);
+  color: var(--accent);
 }
 button {
   border-radius: var(--radius);
@@ -104,6 +105,7 @@ button svg {
 .theme-dark,
 .theme-navy {
   --brand-mark: var(--amber);
+  --accent: var(--amber);
   --text: #ede3cf;
   --muted: #c1b9a9;
   --line: #797260;
@@ -142,7 +144,7 @@ button svg {
   gap: 18px;
   padding: 12px 32px;
   border-bottom: 1px solid var(--text);
-  background: color-mix(in srgb, var(--page-color) 92%, var(--blue));
+  background: color-mix(in srgb, var(--page-color) 92%, var(--accent));
   position: relative;
   z-index: 5;
 }
@@ -257,7 +259,7 @@ button svg {
   font-size: calc(14px * var(--text-scale, 1));
 }
 .nav-item.active {
-  border-bottom-color: var(--blue);
+  border-bottom-color: var(--accent);
 }
 .nav-item:hover {
   background: var(--peach);
@@ -327,10 +329,10 @@ button svg {
   place-items: center;
   min-width: 40px;
   height: 40px;
-  border: 2px solid var(--blue);
+  border: 2px solid var(--accent);
   border-radius: 50%;
   background: var(--peach);
-  color: var(--blue);
+  color: var(--accent);
   font-size: calc(15px * var(--text-scale, 1));
 }
 .account-area {
@@ -399,20 +401,20 @@ button svg {
   width: min(100%, 680px);
   min-height: min(54svh, 690px);
   padding: 48px 32px;
-  border: 3px dashed var(--blue);
+  border: 3px dashed var(--accent);
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--page-color) 94%, var(--blue));
+  background: color-mix(in srgb, var(--page-color) 94%, var(--accent));
   color: var(--text);
   font-size: calc(30px * var(--text-scale, 1));
   font-weight: 700;
 }
 .upload-dropzone:hover {
-  background: color-mix(in srgb, var(--page-color) 88%, var(--blue));
+  background: color-mix(in srgb, var(--page-color) 88%, var(--accent));
 }
 .upload-dropzone > .icon {
   width: 76px;
   height: 76px;
-  color: var(--blue);
+  color: var(--accent);
 }
 .upload-drop-title {
   text-align: center;
@@ -450,20 +452,16 @@ button svg {
   min-height: 48px;
   padding: 6px 12px;
   border: 0;
-  border-bottom: 2px solid var(--blue);
+  border-bottom: 2px solid var(--accent);
   background: transparent;
-  color: var(--blue);
+  color: var(--accent);
   font-size: calc(18px * var(--text-scale, 1));
   font-weight: 600;
 }
-.how-to-trigger span {
-  display: grid;
-  place-items: center;
+.how-to-trigger .icon {
+  flex-shrink: 0;
   width: 28px;
   height: 28px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  font-size: calc(17px * var(--text-scale, 1));
 }
 .home-screen {
   justify-content: flex-start;
@@ -500,10 +498,10 @@ button svg {
   align-items: center;
   justify-content: center;
   gap: 18px;
-  border: 3px dashed var(--blue);
+  border: 3px dashed var(--accent);
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--page-color) 95%, var(--blue));
-  color: var(--blue);
+  background: color-mix(in srgb, var(--page-color) 95%, var(--accent));
+  color: var(--accent);
   z-index: 20;
   pointer-events: none;
   font-size: calc(25px * var(--text-scale, 1));
@@ -989,7 +987,7 @@ button svg {
   border: 0;
   padding: 8px;
   background: transparent;
-  color: var(--blue);
+  color: var(--accent);
   font-size: calc(13px * var(--text-scale, 1));
 }
 .delete-trigger {
@@ -1080,7 +1078,7 @@ button svg {
 }
 .text-button {
   min-height: 48px;
-  color: var(--blue);
+  color: var(--accent);
   border: 0;
   background: transparent;
   padding: 6px 16px;
@@ -1167,9 +1165,9 @@ button svg {
   width: 132px;
   height: 132px;
   margin: 0 auto 18px;
-  border: 2px solid var(--blue);
+  border: 2px solid var(--accent);
   border-radius: var(--radius);
-  color: var(--blue);
+  color: var(--accent);
 }
 .how-to-icon .icon {
   width: 62px;
@@ -1279,7 +1277,7 @@ legend {
   min-width: 0;
   flex: 1;
   width: 100%;
-  accent-color: var(--blue);
+  accent-color: var(--accent);
   cursor: pointer;
   height: 36px;
 }
@@ -1293,7 +1291,7 @@ legend {
   flex: 1;
   width: 100%;
   min-width: 0;
-  accent-color: var(--blue);
+  accent-color: var(--accent);
   cursor: pointer;
 }
 .spacing-control span {
@@ -1332,7 +1330,7 @@ legend {
   color: var(--ink);
 }
 .swatch[aria-pressed="true"] {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 .theme-dark .swatch[aria-pressed="true"] {
@@ -1990,6 +1988,9 @@ legend {
   .home-screen {
     padding-top: 34px;
   }
+  .upload-dropzone .drag-only {
+    display: none;
+  }
   .upload-dropzone {
     min-height: min(58svh, 560px);
     gap: 22px;
@@ -2058,7 +2059,7 @@ legend {
 .upload-counter .icon { width: 18px; height: 18px; }
 .upload-counter.exhausted { color: var(--brick); }
 .counter-mobile, .pro-mobile-label { display: none; }
-.go-pro { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; padding: 8px 12px; border: 1px solid var(--blue); background: transparent; color: var(--text); font-size: calc(13px * var(--text-scale, 1)); }
+.go-pro { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; padding: 8px 12px; border: 1px solid var(--accent); background: transparent; color: var(--text); font-size: calc(13px * var(--text-scale, 1)); }
 .go-pro .icon { width: 18px; height: 18px; }
 .go-pro:hover { background: var(--peach); color: var(--ink); }
 .pro-tag { display: inline-block; flex-shrink: 0; padding: 1px 5px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--peach); color: var(--ink); font-size: calc(10px * var(--text-scale, 1)); font-weight: 700; text-transform: uppercase; line-height: 1.5; }
@@ -2086,7 +2087,7 @@ legend {
 .reader-side { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .reader-side .original-photo { flex: 1; width: 100%; min-height: 200px; }
 .reader-panel { padding-bottom: 32px; }
-.summary-panel { padding: 18px; border: 1px solid var(--blue); border-radius: var(--radius); background: var(--page-color); font-size: calc(16px * var(--text-scale, 1)); line-height: var(--reader-leading); }
+.summary-panel { padding: 18px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--page-color); font-size: calc(16px * var(--text-scale, 1)); line-height: var(--reader-leading); }
 .summary-panel h2 { font-size: inherit; font-weight: 700; margin: 0 0 10px; }
 .summary-panel p { margin: 0; }
 .summary-panel ul { margin: 0; padding-left: 1.3em; }
@@ -2097,10 +2098,10 @@ legend {
 .no-upload-used .icon { width: 18px; height: 18px; }
 .listen-player { display: flex; align-items: center; gap: 14px; position: sticky; bottom: 0; z-index: 6; padding: 12px 16px; margin-top: 18px; border: 1px solid var(--line); background: var(--peach); color: var(--ink); }
 .player-toggle { display: grid; place-items: center; flex-shrink: 0; width: 48px; height: 48px; border: 0; border-radius: 50%; background: var(--blue); color: var(--cream); }
-.listen-player progress { appearance: none; border: 0; border-radius: 0; width: 100%; min-width: 0; height: 6px; background: var(--line); accent-color: var(--blue); }
+.listen-player progress { appearance: none; border: 0; border-radius: 0; width: 100%; min-width: 0; height: 6px; background: var(--line); accent-color: var(--accent); }
 .listen-player progress::-webkit-progress-bar { background: var(--line); }
-.listen-player progress::-webkit-progress-value { background: var(--blue); }
-.listen-player progress::-moz-progress-bar { background: var(--blue); }
+.listen-player progress::-webkit-progress-value { background: var(--accent); }
+.listen-player progress::-moz-progress-bar { background: var(--accent); }
 .player-close { flex-shrink: 0; border: 0; background: transparent; color: var(--ink); }
 .player-status { font-size: calc(12px * var(--text-scale, 1)); }
 .reading-settings, .listen-settings { display: flex; flex-direction: column; gap: 23px; min-width: 0; }
@@ -2108,7 +2109,7 @@ legend {
 .settings-dialog { width: min(760px, calc(100vw - 48px)); }
 .listen-settings { border-left: 1px solid var(--line); padding-left: 24px; }
 .listen-settings h2 { display: flex; align-items: center; gap: 8px; justify-content: flex-start; margin: 0; font-size: calc(15px * var(--text-scale, 1)); }
-.listen-settings input { width: 100%; min-height: 48px; accent-color: var(--blue); }
+.listen-settings input { width: 100%; min-height: 48px; accent-color: var(--accent); }
 .listen-settings fieldset:disabled { opacity: .6; }
 .listen-settings fieldset:disabled button { cursor: default; opacity: 1; }
 .listen-settings-lock { min-height: 48px; background: transparent; color: var(--text); border: 1px solid var(--line); font-size: calc(13px * var(--text-scale, 1)); }
@@ -2125,7 +2126,7 @@ legend {
   .navbar .brand-subtitle { display: none; }
   .navbar .brand-icon { width: 30px; height: 34px; }
   .navbar .brand-icon .icon { width: 22px; height: 22px; }
-  .navbar .brand-name { font-size: calc(18px * var(--text-scale, 1)); }
+  .navbar .brand-copy { display: none; }
   .navbar .wordmark { gap: 7px; min-height: 48px; }
   .counter-desktop, .pro-desktop-label { display: none; }
   .counter-mobile, .pro-mobile-label { display: inline; }
@@ -2134,8 +2135,8 @@ legend {
   .navbar .nav-item span { display: none; }
   .navbar .nav-item { min-width: 48px; justify-content: center; }
   .reader-top { justify-content: flex-start; }
-  .reader-actions { width: 100%; justify-content: flex-start; }
-  .reader-action { flex: 1; }
+  .reader-actions { width: 100%; justify-content: flex-start; flex-wrap: nowrap; }
+  .reader-action { flex: 1 1 0; min-width: 0; padding: 9px 8px; gap: 5px; text-align: center; }
   .reader-split { flex-direction: column; }
   .reader-side { order: -1; }
   .reader-side .original-photo { display: none; }
@@ -2159,3 +2160,12 @@ legend {
 @media (max-width: 350px) {
   .navbar .nav-upload { display: none; }
 }
+
+/* Ticking loading dots: each dot appears in turn, then all reset. Reduced motion shows them static. */
+.loading-dots > span { animation: loading-dot 1.2s steps(1, end) infinite; }
+.loading-dots > span:nth-child(1) { animation-name: loading-dot-1; }
+.loading-dots > span:nth-child(2) { animation-name: loading-dot-2; }
+.loading-dots > span:nth-child(3) { animation-name: loading-dot-3; }
+@keyframes loading-dot-1 { 0% { opacity: 0; } 25%, 100% { opacity: 1; } }
+@keyframes loading-dot-2 { 0%, 25% { opacity: 0; } 50%, 100% { opacity: 1; } }
+@keyframes loading-dot-3 { 0%, 50% { opacity: 0; } 75%, 100% { opacity: 1; } }
