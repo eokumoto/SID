@@ -778,9 +778,8 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           ? '"Lexend", system-ui'
           : "Arial, sans-serif",
     "--page-color": background,
-    // Reader text uses the same chosen surface as the rest of the app. Borders
-    // and semantic raised surfaces provide separation without changing colors.
-    "--panel-color": background,
+    // Text panels use the same subtle raised surface as controls, cards, and dialogs.
+    "--panel-color": "var(--surface-raised)",
     "--text-scale": settings.size / 22,
     "--line-scale": spacing.leading / 1.7,
     "--reader-size": `${settings.size}px`,
