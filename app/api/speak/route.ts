@@ -46,18 +46,27 @@ export async function POST(request: Request) {
     recent.push(now); calls.set(data.user.id, recent);
     const key = process.env.GOOGLE_TTS_API_KEY;
     if (!key) return reply({ error: "unavailable" }, 503);
-    const response = await fetch("https://texttospeech.googleapis.com/v1beta1/text:synthesize", {
+    const synthesize = (body: object) => fetch("https://texttospeech.googleapis.com/v1beta1/text:synthesize", {
       method: "POST", signal,
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        input: { ssml: input.ssml }, voice: { languageCode: "en-US", name: SPEECH_VOICES[voice as Voice] },
-        audioConfig: { audioEncoding: "MP3", speakingRate: 1 }, enableTimePointing: ["SSML_MARK"],
-      }),
+      body: JSON.stringify(body),
     });
+    const audioConfig = { audioEncoding: "MP3", speakingRate: 1 };
+    const names = SPEECH_VOICES[voice as Voice];
+    // Chirp 3: HD first. It has no word timepoints, so the client estimates them (marks: []).
+    let response = await synthesize({ input: { text: body.text }, voice: { languageCode: "en-US", name: names.hd }, audioConfig });
+    let timed = false;
+    if (!response.ok && !signal.aborted) {
+      response = await synthesize({
+        input: { ssml: input.ssml }, voice: { languageCode: "en-US", name: names.fallback },
+        audioConfig, enableTimePointing: ["SSML_MARK"],
+      });
+      timed = true;
+    }
     if (!response.ok) return reply({ error: "unavailable" }, 502);
     const audio = await response.json();
     if (typeof audio.audioContent !== "string" || audio.audioContent.length > 8000000) return reply({ error: "unavailable" }, 502);
-    const marks = (Array.isArray(audio.timepoints) ? audio.timepoints : []).flatMap((mark: { markName?: string; timeSeconds?: number }) => {
+    const marks = (timed && Array.isArray(audio.timepoints) ? audio.timepoints : []).flatMap((mark: { markName?: string; timeSeconds?: number }) => {
       const index = /^w\d+$/.test(mark.markName ?? "") ? Number(mark.markName!.slice(1)) : -1;
       const word = input.words[index];
       return word && typeof mark.timeSeconds === "number" && Number.isFinite(mark.timeSeconds) && mark.timeSeconds >= 0
