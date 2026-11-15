@@ -17,6 +17,9 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
   notify: (message: string) => void;
 }) {
   const [view, setView] = useState<"text" | "photo">(initialView);
+  // A signed photo URL can expire while the reader is open; fall back to the placeholder.
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const photoUrl = photoFailed ? "" : scan.photoUrl;
   const [listening, setListening] = useState(false);
   const [word, setWord] = useState<{ start: number; length: number } | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(initialSummary);
@@ -134,14 +137,14 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
             {summaryLoading ? <p role="status">Creating summary<LoadingDots /></p> : bullets && !unavailable ? <><ul>{bullets.map((bullet, i) => <li key={i}>{bullet}</li>)}</ul><p className="summary-note">Full text stays visible.</p></> : <p role="status">{unavailable || summaryMessage || "Select Summary to get started."}</p>}
           </aside>}
           <button type="button" className="original-photo" aria-label="Open original photo" title="Open photo" onClick={openPhoto}>
-            {scan.photoUrl ? <ScanImage src={scan.photoUrl} alt="Original scan" /> : <span className="missing-photo"><Icon name="photo" />Photo unavailable</span>}
+            {photoUrl ? <ScanImage src={photoUrl} alt="Original scan" onError={() => setPhotoFailed(true)} /> : <span className="missing-photo"><Icon name="photo" />Photo unavailable</span>}
           </button>
         </div>
       </div>
       <div className="mobile-reader-tools"><button type="button" className="photo-thumbnail" aria-label="Open original photo" title="Open photo" onClick={openPhoto}>
-        {scan.photoUrl ? <ScanImage src={scan.photoUrl} alt="Original scan thumbnail" /> : <Icon name="photo" />}
+        {photoUrl ? <ScanImage src={photoUrl} alt="Original scan thumbnail" onError={() => setPhotoFailed(true)} /> : <Icon name="photo" />}
       </button></div>
-    </> : <PhotoView key={scan.id} url={scan.photoUrl} regions={scan.textRegions} onNewPhoto={onNewPhoto} onOverlayRemoved={scan.sample ? undefined : () => onOverlayRemoved?.(scan.id)} onSwipeBack={() => { setView("text"); setSwipeIn("from-left"); }} />}
+    </> : <PhotoView key={scan.id} url={photoUrl} regions={scan.textRegions} onNewPhoto={onNewPhoto} onOverlayRemoved={scan.sample ? undefined : () => onOverlayRemoved?.(scan.id)} onSwipeBack={() => { setView("text"); setSwipeIn("from-left"); }} />}
     {listening && pro && <ListenPlayer text={fullText} settings={settings} preview={!!scan.sample} onWord={setWord} notify={notify} onClose={() => { setListening(false); setWord(null); }} />}
   </section>;
 }
