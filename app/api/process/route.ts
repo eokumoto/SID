@@ -78,8 +78,10 @@ async function visionToken(account: ServiceAccount, signal: AbortSignal) {
     }),
   });
   const data: unknown = await response.json().catch(() => null);
-  if (!response.ok || !data || typeof data !== "object" || typeof (data as { access_token?: unknown }).access_token !== "string")
+  if (!response.ok || !data || typeof data !== "object" || typeof (data as { access_token?: unknown }).access_token !== "string") {
+    console.warn("Vision OCR token request failed", { status: response.status });
     throw new Error("vision_token_failed");
+  }
   return (data as { access_token: string }).access_token;
 }
 
@@ -182,7 +184,10 @@ async function readWithVision(bytes: Buffer, signal: AbortSignal) {
   });
   const data: unknown = await response.json().catch(() => null);
   const first = data && typeof data === "object" ? (data as { responses?: unknown[] }).responses?.[0] : null;
-  if (!response.ok || !first || typeof first !== "object") throw new Error("vision_failed");
+  if (!response.ok || !first || typeof first !== "object") {
+    console.warn("Vision OCR request failed", { status: response.status });
+    throw new Error("vision_failed");
+  }
   const annotation = (first as { fullTextAnnotation?: VisionAnnotation }).fullTextAnnotation;
   if (!annotation || typeof annotation.text !== "string" || !annotation.text.trim()) throw new Error("vision_empty");
   return { text: annotation.text.trim(), textRegions: visionLineRegions(annotation) };
@@ -337,7 +342,10 @@ async function processRequest(request: Request, deadline: AbortSignal) {
     if (!mimeType || mimeType !== file.type) return fail("wrong_type", 400);
     const visionEnabled = process.env.VISION_ENABLED === "true";
     const vision = visionEnabled
-      ? readWithVision(bytes, AbortSignal.any([deadline, AbortSignal.timeout(12_000)])).catch(() => null)
+      ? readWithVision(bytes, AbortSignal.any([deadline, AbortSignal.timeout(12_000)])).catch((error) => {
+          console.warn("Vision OCR second read unavailable", error instanceof Error ? error.message : "unknown");
+          return null;
+        })
       : Promise.resolve(null);
     const [gemini, secondRead] = await Promise.all([readWithGemini(bytes, mimeType, deadline), vision]);
     const ocrText = gemini.source_text;
