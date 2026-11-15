@@ -2297,3 +2297,114 @@ legend {
 @media (min-width: 701px) {
   .reader-top.stacked { width: fit-content; max-width: 100%; }
 }
+
+/* Account page */
+.account-screen {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.account-screen h1 {
+  margin: 0 0 6px;
+  font-size: calc(30px * var(--text-scale, 1));
+}
+.account-screen > .sample-label {
+  align-self: flex-start;
+}
+.account-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--page-color);
+}
+.account-card h2 {
+  margin: 0;
+  font-size: calc(18px * var(--text-scale, 1));
+}
+.account-name-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.account-name-form label,
+.account-detail > span:first-child {
+  color: var(--muted);
+  font-size: calc(13px * var(--text-scale, 1));
+}
+.account-name-row {
+  display: flex;
+  gap: 10px;
+}
+.account-name-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  padding: 12px;
+  background: var(--page-color);
+  color: var(--text);
+  border: 1px solid var(--text);
+  border-radius: var(--radius);
+  font-size: calc(15px * var(--text-scale, 1));
+}
+.account-detail {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: calc(15px * var(--text-scale, 1));
+  overflow-wrap: anywhere;
+}
+.account-plan-name {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: calc(16px * var(--text-scale, 1));
+}
+.account-plan-name.pro {
+  color: #2c6a66;
+}
+.theme-dark .account-plan-name.pro,
+.theme-navy .account-plan-name.pro {
+  color: var(--amber);
+}
+.account-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: 1.6;
+}
+.account-actions,
+.account-plan-error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.account-logout {
+  align-self: flex-start;
+}
+@media (max-width: 700px) {
+  .account-screen {
+    padding: 26px 18px;
+  }
+  .account-screen h1 {
+    font-size: calc(28px * var(--text-scale, 1));
+  }
+  .account-actions,
+  .account-actions .button,
+  .account-logout {
+    width: 100%;
+  }
+  .account-logout {
+    align-self: stretch;
+  }
+}
