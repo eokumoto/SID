@@ -25,10 +25,10 @@ type ServiceAccount = {
   token_uri?: string;
 };
 
-function json(body: object, status = 200) {
+function json(body: object, status = 200, retryAfter?: number) {
   return Response.json(body, {
     status,
-    headers: { "Cache-Control": "no-store, max-age=0" },
+    headers: { "Cache-Control": "no-store, max-age=0", ...(retryAfter ? { "Retry-After": String(retryAfter) } : {}) },
   });
 }
 
@@ -205,8 +205,7 @@ async function processRequest(request: Request, deadline: AbortSignal) {
   if (typeof documentId !== "string" || !UUID.test(documentId)) return json({ error: "server" }, 400);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
-  const dailyLimit = Number(process.env.DAILY_LIMIT || "20");
-  if (!url || !serviceKey || !Number.isSafeInteger(dailyLimit) || dailyLimit < 1) return json({ error: "server" }, 503);
+  if (!url || !serviceKey) return json({ error: "server" }, 503);
   const supabase = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { fetch: (input, init) => fetch(input, { ...init, signal: deadline }) },
@@ -222,11 +221,16 @@ async function processRequest(request: Request, deadline: AbortSignal) {
   const expectedPath = `${userId}/${documentId}.jpg`;
   if (document.image_path !== expectedPath) return json({ error: "server" }, 400);
   if (!process.env.GEMINI_API_KEY) return json({ error: "server" }, 503);
-  const { data: claim, error: claimingError } = await supabase.rpc("claim_scan", { document_id: documentId, owner_id: userId, max_scans: dailyLimit });
+  const { data: claim, error: claimingError } = await supabase.rpc("claim_pro_scan", { document_id: documentId, owner_id: userId });
   if (claimingError || !claim) return json({ error: "server" }, 503);
   if (claim.error) {
-    const busy = claim.error === "already_processing" || claim.error === "daily_limit";
-    return json({ error: busy ? "busy" : "server" }, busy ? 409 : 500);
+    if (claim.error === "rate_limit") {
+      const retryAfter = typeof claim.retry_after === "number" && Number.isFinite(claim.retry_after)
+        ? Math.max(1, Math.min(600, Math.ceil(claim.retry_after))) : 600;
+      return json({ error: "rate_limit" }, 429, retryAfter);
+    }
+    const status = claim.error === "daily_limit" ? 429 : claim.error === "not_found" ? 404 : claim.error === "already_processing" ? 409 : 400;
+    return json({ error: claim.error }, status);
   }
   if (claim.document?.status === "ready") return json({ document: claim.document });
   const attemptId = claim.document?.attempt_id;
@@ -238,7 +242,7 @@ async function processRequest(request: Request, deadline: AbortSignal) {
         auth: { persistSession: false, autoRefreshToken: false },
         global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(3000) }) },
       });
-      await cleanup.from("documents").update({ status: "failed", error }).eq("id", documentId).eq("user_id", userId).eq("status", "processing").eq("attempt_id", attemptId);
+      await cleanup.rpc("finish_pro_scan", { document_id: documentId, owner_id: userId, expected_attempt: attemptId, outcome: { error } });
     } catch { /* Stale claims can be recovered after two minutes. */ }
     return json({ error }, status);
   };
@@ -267,15 +271,13 @@ async function processRequest(request: Request, deadline: AbortSignal) {
     const title = (ocrText.split(/\r?\n/).find((line) => line.trim()) ?? "Scan").trim().slice(0, 80);
     // Keep the legacy plain_text column for existing clients, but never save a rewrite.
     const fields = { title, status: "ready", error: null, ocr_text: ocrText, plain_text: ocrText, flags, key_terms: gemini.key_terms, gemini_source_text: gemini.source_text, ocr_source: ocrSource, warnings };
-    const save = (withLayout: boolean) => supabase.from("documents").update(withLayout ? { ...fields, text_regions: textRegions } : fields).eq("id", documentId).eq("user_id", userId).eq("status", "processing").eq("attempt_id", attemptId).select().maybeSingle();
-    let { data: saved, error: saveError } = await save(true);
-    // An unapplied optional layout migration must not break working text scans.
-    if (saveError && ["PGRST204", "42703"].includes(saveError.code)) {
-      ({ data: saved, error: saveError } = await save(false));
-    }
+    const { data: completion, error: saveError } = await supabase.rpc("finish_pro_scan", {
+      document_id: documentId, owner_id: userId, expected_attempt: attemptId,
+      outcome: { ...fields, text_regions: textRegions },
+    });
     if (saveError) return fail("server", 500);
-    if (!saved) return json({ error: "busy" }, 409);
-    return json({ document: { ...saved, text_regions: textRegions } });
+    if (!completion?.document) return json({ error: "server" }, 409);
+    return json({ document: completion.document });
   } catch (error) {
     const code = deadline.aborted
       ? "timeout"

@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({page}) => {
+  await page.route('**/api/account', route => route.fulfill({ json: { plan:'free', limit:10, used:0, remaining:10, resetsAt:'2027-01-01T00:00:00Z' } }));
+});
+
 for (const [name, viewport] of [['desktop', { width: 1440, height: 1000 }], ['phone', { width: 390, height: 844 }]]) {
   test(`${name}: positioned text stays attached to the image through toggle, zoom and pan`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
@@ -43,7 +47,7 @@ for (const [name, viewport] of [['desktop', { width: 1440, height: 1000 }], ['ph
     await page.getByRole('button', { name: 'Text', exact: true }).click();
     await expect(page.getByRole('article', { name: 'Transcribed text' })).toContainText('FREE FLU SHOTS');
     await expect(page.getByText('Simplified by AI.', { exact: false })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Read aloud', exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Listen/ }).first()).toBeVisible();
     expect(errors).toEqual([]);
   });
 }

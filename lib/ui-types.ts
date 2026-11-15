@@ -8,6 +8,8 @@ export type ReaderSettings = {
     | "Slightly wide"
     | "Wide";
   background: "cream" | "peach" | "dark" | "navy";
+  voice: import("./speech").Voice;
+  speed: number;
 };
 
 export type Scan = {

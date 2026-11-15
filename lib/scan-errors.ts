@@ -6,6 +6,9 @@ export type ScanErrorCode =
   | "busy"
   | "timeout"
   | "network"
+  | "daily_limit"
+  | "rate_limit"
+  | "already_processing"
   | "server";
 
 export type ScanErrorCopy = {
@@ -15,6 +18,9 @@ export type ScanErrorCopy = {
 };
 
 const messages: Record<ScanErrorCode, ScanErrorCopy> = {
+  daily_limit: { title: "No uploads left today", detail: "Your allowance resets at midnight UTC", canRetry: false },
+  rate_limit: { title: "Try again shortly", detail: "Wait a few minutes, then try again. Your upload credits are unchanged", canRetry: true },
+  already_processing: { title: "Still reading", detail: "Try again in a moment", canRetry: true },
   no_text: { title: "No words found", detail: "Try a photo of a menu, sign or page", canRetry: false },
   blurry: { title: "Too blurry", detail: "Hold steady and try again", canRetry: false },
   too_big: { title: "Photo too big", detail: "Try a smaller photo", canRetry: false },

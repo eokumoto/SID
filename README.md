@@ -102,3 +102,7 @@ Password auth replaces the original magic-link login requirement in the supplied
 This UX intentionally discloses whether an email has an Auth account in this Supabase project. It does not disclose names or user records. Lookup does not authorize access to account data; password/Google authentication and RLS still apply. Unknown/missing server config or an unapplied migration fails closed with an unavailable message, never a guessed signup/login result. Preview screens keep their sample-only manual paths and never query real accounts.
 
 Supabase Auth users and email quotas are shared by all apps using the same Supabase project. The built-in email sender currently allows two emails/hour per project and team addresses only. Confirmation, reset, and earlier magic-link requests can consume that quota; deleting users does not reset a project email quota. With Confirm email disabled, password signup does not need a confirmation email, which can explain why another project permitted many signups. For public email delivery, configure custom SMTP and review Authentication → Rate Limits. Confirm email/SMTP/rate-limit dashboard settings are not changed by this code or migration. Diagnose specific failures in Authentication logs; never share access tokens or private keys in screenshots.
+
+## Pro features
+
+See [Pro setup and verification](docs/PRO_FEATURES.md) for the allowance migration, manual Pro assignment, sample screens, and disabled $3.99/month upgrade UI. The current theme colors are preserved. No Stripe payments are connected.

@@ -9,6 +9,8 @@ const defaults: ReaderSettings = {
   size: 21,
   spacing: "Normal",
   background: "cream",
+  voice: "Calm",
+  speed: 1,
 };
 const initial = JSON.stringify(defaults);
 let memory = initial;
@@ -20,6 +22,8 @@ export function validateSettings(value: unknown): ReaderSettings {
       ? (value as Partial<ReaderSettings>)
       : {};
   return {
+    voice: ["Calm", "Clear", "Warm"].includes(v.voice ?? "") ? v.voice! : defaults.voice,
+    speed: typeof v.speed === "number" && Number.isFinite(v.speed) ? Math.min(2, Math.max(.25, v.speed)) : defaults.speed,
     font: ["OpenDyslexic", "Lexend", "Arial"].includes(v.font ?? "")
       ? v.font!
       : defaults.font,
