@@ -778,32 +778,6 @@ button svg {
   overflow-wrap: anywhere;
   padding: 0 1px;
 }
-.tilted-photo-banner {
-  position: absolute;
-  z-index: 2;
-  top: 12px;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: calc(100% - 24px);
-  padding: 8px 10px;
-  border: 1px solid var(--ink);
-  background: var(--cream);
-  color: var(--ink);
-  font-size: calc(12px * var(--text-scale, 1));
-  line-height: 1.25;
-  transform: translateX(-50%);
-}
-.tilted-photo-banner button {
-  flex: 0 0 auto;
-  padding: 6px 8px;
-  border: 0;
-  background: var(--blue);
-  color: var(--cream);
-  font: inherit;
-  font-weight: 700;
-}
 .overlay-unavailable {
   color: var(--muted);
 }
@@ -2073,9 +2047,10 @@ legend {
 .pro-price { text-align: center; font-size: calc(24px * var(--text-scale, 1)); margin: 20px 0 14px; }
 .pro-price span, .pro-coming-soon { font-size: calc(13px * var(--text-scale, 1)); color: var(--muted); }
 .pro-coming-soon { text-align: center; margin-bottom: 0; }
-.reader-top { justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+/* Centered at every width, so when the actions wrap below the toggle both rows stay centered in the box. */
+.reader-top { justify-content: center; gap: 12px; flex-wrap: wrap; max-width: 100%; }
 .reader-top .view-toggle { flex-shrink: 0; }
-.reader-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.reader-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .reader-action { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; padding: 9px 12px; border: 1px solid var(--line); background: var(--page-color); color: var(--text); font-size: calc(13px * var(--text-scale, 1)); }
 .reader-action .icon { width: 18px; height: 18px; }
 .reader-action.active { background: var(--blue); border-color: var(--blue); color: var(--cream); }
@@ -2133,7 +2108,7 @@ legend {
   .upload-counter { min-height: 48px; }
   .navbar .nav-item span { display: none; }
   .navbar .nav-item { min-width: 48px; justify-content: center; }
-  .reader-top { justify-content: flex-start; }
+  .reader-top { justify-content: center; }
   .reader-actions { width: 100%; justify-content: flex-start; flex-wrap: nowrap; }
   /* Icon, label and Pro tag always share one line; sizes cap to the viewport so it fits narrow phones. */
   .reader-action { flex: 1 1 0; min-width: 0; padding: 9px 6px; gap: 4px; flex-wrap: nowrap; white-space: nowrap; overflow-wrap: normal; font-size: min(calc(13px * var(--text-scale, 1)), 3.4vw); }
@@ -2227,3 +2202,62 @@ legend {
 .swipe-from-left > :is(.reader-split, .photo-view) { animation: swipe-from-left 240ms ease-out; }
 @keyframes swipe-from-right { from { transform: translateX(36px); opacity: 0.3; } to { transform: none; opacity: 1; } }
 @keyframes swipe-from-left { from { transform: translateX(-36px); opacity: 0.3; } to { transform: none; opacity: 1; } }
+
+/* History heading: title and Upload button share one line; the title never breaks mid-word. */
+.history-heading h1 {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+.history-heading .button {
+  flex-shrink: 0;
+}
+
+/* Nav items never squish: when space runs out the navbar switches to its compact layout instead. */
+.navbar nav > *,
+.navbar .wordmark .brand-icon {
+  flex-shrink: 0;
+}
+/* Avatar is always a true circle, growing with large text sizes. */
+.sid-app .avatar {
+  width: max(48px, 2.4em);
+  height: max(48px, 2.4em);
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 1;
+  padding: 0;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  line-height: 1;
+}
+/* The avatar's peach fill stays light in every theme, so its letter stays blue for contrast; the ring follows the theme accent. */
+.sid-app .avatar { color: var(--blue); }
+
+/* Mobile: the back arrow replaces the logo while reading; the logo slides back when you leave the reader. */
+@media (max-width: 700px) {
+  .navbar .wordmark {
+    max-width: 64px;
+    overflow: hidden;
+    transition: max-width 220ms ease, opacity 160ms ease, margin 220ms ease, visibility 0s;
+  }
+  .navbar.reader-open .wordmark {
+    max-width: 0;
+    margin-left: -12px; /* cancels the navbar gap so no empty space is left */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: max-width 220ms ease, opacity 160ms ease, margin 220ms ease, visibility 0s 220ms;
+  }
+}
+
+/* Toggle box stacked (ReaderView adds .stacked when Listen/Summary wrap): rows share one width and the
+   box hugs the widest row. Phones keep the full-width box. */
+.reader-top.stacked { flex-direction: column; align-items: stretch; }
+.reader-top.stacked .view-toggle { width: auto; }
+.reader-top.stacked .reader-actions { flex-wrap: nowrap; }
+.reader-top.stacked .reader-action { flex: 1 1 0; }
+@media (min-width: 701px) {
+  .reader-top.stacked { width: fit-content; max-width: 100%; }
+}

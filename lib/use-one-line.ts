@@ -3,6 +3,8 @@
 import { useEffect, type RefObject } from "react";
 
 const MIN_FONT_RATIO = 0.7;
+// Single-line labels that shrink their font instead of overflowing.
+const FIT_SELECTOR = "button, .button, .history-heading h1";
 
 const overflows = (element: Element | null) =>
   !!element && element.scrollWidth > element.clientWidth + 1;
@@ -19,9 +21,9 @@ function fitNavbar(root: HTMLElement) {
   if (tooWide()) navbar.classList.add("nav-minimal");
 }
 
-// Any button whose single-line label is wider than the button gets a smaller font, down to 70%.
-function fitButtons(root: HTMLElement) {
-  root.querySelectorAll<HTMLElement>("button, .button").forEach((element) => {
+// Any single-line label wider than its box gets a smaller font, down to 70%.
+function fitLabels(root: HTMLElement) {
+  root.querySelectorAll<HTMLElement>(FIT_SELECTOR).forEach((element) => {
     if (element.classList.contains("upload-dropzone")) return;
     element.style.removeProperty("font-size");
     if (!overflows(element)) return;
@@ -44,7 +46,7 @@ export function useOneLineLabels(root: RefObject<HTMLElement | null>, settingsKe
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         fitNavbar(element);
-        fitButtons(element);
+        fitLabels(element);
       });
     };
     fit();

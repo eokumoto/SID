@@ -19,7 +19,7 @@ Open [localhost:3000](http://localhost:3000). No credentials are needed to revie
 - Live font/size/spacing/background settings stored on this device; signed-in accounts also sync `profiles.settings` when Supabase is configured.
 - Read aloud with word-boundary highlighting where supported, section highlighting otherwise. Browser/voice support varies.
 - Verbatim OCR in Text view, with the original wording and line breaks. No automatic simplification or summary.
-- Readable text overlays positioned over uploaded photos using Gemini line boxes, plus Original toggle, zoom and pan. Optional Vision remains a separate OCR check, not a requirement for overlays.
+- Readable text overlays positioned over uploaded photos using Gemini line boxes, plus Original toggle, zoom and pan.
 - Optional Google OAuth and email/password login and signup, plus account history reads and deletion through Supabase RLS. Configure both public Supabase variables in `.env.local`, auth providers, and allowed app redirect URLs before using these integrations. Real auth/database behavior needs a configured project to verify.
 
 ## Preview screens
@@ -44,16 +44,15 @@ Settings persist locally, including when reviewing samples. History samples rese
 
 ## Scanning setup
 
-Uploads are stored privately in Supabase Storage, then processed by the server-only `/api/process` route. Gemini transcribes the image without simplifying, answering, or paraphrasing it and returns normalized text-line positions for Photo view. Google Cloud Vision can optionally perform a second OCR read; when it is unavailable, a successful Gemini scan still completes.
+Uploads are stored privately in Supabase Storage, then processed by the server-only `/api/process` route. Gemini transcribes the image without simplifying, answering, or paraphrasing it and returns normalized text-line positions for Photo view.
 
 1. Apply all Supabase migrations in order, including `20261114000000_scan_processing.sql`, `20261114010000_processing_claims.sql`, `20261114020000_transcription_layout.sql`, and `20261115000000_pro_features.sql`. The layout migration saves optional overlay positions in `text_regions`; the Pro migration is required by the current processing route for entitlements and upload allowances. Deploy the new client and route together after the migrations; older clients that insert `status` are deliberately rejected by the restricted input permissions.
 2. In `.env.local` and the deployment environment, set the two public Supabase values, `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`), and `GEMINI_API_KEY`. `GEMINI_MODEL` defaults to the pinned `gemini-3.5-flash-lite`; confirm the configured model is available to your key before the live scan check. Update any existing Vercel override of `gemini-2.5-flash`, which Google now restricts to previous users; see [Google's deprecation notice](https://aistudio.google.com/docs/deprecations#gemini-2.5-flash-models). Redeploy after changing environment variables. `DAILY_LIMIT` is no longer used. Free accounts receive 10 successful uploads per UTC day; Pro receives 150. Failed reads do not use a daily upload. A separate safety limit allows 10 processing attempts per user per 10 minutes.
 3. Enable anonymous sign-ins in Supabase Auth so a visitor can scan before logging in.
-4. To enable the second OCR pass, enable Cloud Vision API, give a service account Vision access, set `GOOGLE_CLOUD_CREDENTIALS` to its JSON credentials (or a base64-encoded copy), and set `VISION_ENABLED=true`.
 
-Images are limited to 5 MiB and JPEG, PNG, or WebP. Provider credentials stay on the server and are never sent to the browser.
+Uploads are converted to JPEG in the browser (any format it can open, such as HEIC on Safari) and limited to 5 MiB; the server accepts JPEG, PNG, or WebP. Provider credentials stay on the server and are never sent to the browser.
 
-Processing claims and daily usage are reserved in one database transaction. Active duplicates observe the existing attempt; expired attempts can be retried after two minutes. Completion and failure writes match the attempt id, so old workers cannot overwrite a Retry or recreate a deleted scan. Gemini JSON is validated and retried once on malformed output; optional Vision runs in parallel with its own timeout. Ready rows reopen without provider calls.
+Processing claims and daily usage are reserved in one database transaction. Active duplicates observe the existing attempt; expired attempts can be retried after two minutes. Completion and failure writes match the attempt id, so old workers cannot overwrite a Retry or recreate a deleted scan. Gemini JSON is validated and retried once on malformed output. Ready rows reopen without provider calls.
 
 The legacy `plain_text` field now stores the same transcription as `ocr_text`; the server does not trust a model's alternate wording. Existing saved scans display their stored OCR in preference to older rewrites, without reprocessing or changing history. Optional second-read comparisons retain advisory uncertainty data. OCR can still misread a photo; verbatim mode means no intentional rewrite, not a guarantee of perfect recognition. The obsolete “Simplified by AI” label is removed.
 

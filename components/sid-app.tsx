@@ -113,6 +113,8 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const pendingFailures = useRef(0);
   const importPendingScanRef = useRef<(destination: User) => void>(() => {});
   const localPhoto = useRef<string | null>(null);
+  // Guests' photos are deleted on the server after each read, so a guest retry re-uploads this copy.
+  const lastGuestFile = useRef<File | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const workRun = useRef(0);
   const [errorCode, setErrorCode] = useState<ScanErrorCode>(
@@ -518,6 +520,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     dragDepth.current = 0;
     setScreen("processing");
     const preparedFile = await prepareUprightImage(file);
+    lastGuestFile.current = preparedFile;
     if (run !== workRun.current) return;
     // Validate the re-encoded file, which is what is actually uploaded. If the browser
     // couldn't decode the original, it comes back unchanged and must already be a supported type.
@@ -708,6 +711,10 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       );
       return;
     }
+    if (!user && lastGuestFile.current) {
+      void showFile(lastGuestFile.current);
+      return;
+    }
     const documentId = chosen?.id ?? processingId;
     if (!documentId) {
       picker.current?.click();
@@ -788,7 +795,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <header className={`navbar ${signedIn ? "has-account" : ""}`}>
+      <header className={`navbar ${signedIn ? "has-account" : ""} ${screen === "reader" ? "reader-open" : ""}`}>
         <div
           className={`reader-back-slot ${screen === "reader" ? "is-visible" : ""}`}
           aria-hidden={screen !== "reader"}
@@ -978,7 +985,6 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             pro={pro}
             onUpgrade={openPro}
             initialSummary={preview === "pro" || preview === "pro-menu"}
-            onNewPhoto={() => picker.current?.click()}
             onOverlayRemoved={(documentId) => void recordRemovedOverlay(documentId)}
           />
         )}

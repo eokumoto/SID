@@ -2,8 +2,6 @@ export type TextRegion = {
   text: string;
   // Image-relative coordinates, 0–1000: top, left, bottom, right.
   box_2d: [number, number, number, number];
-  // Optional Vision paragraph corners, normalized to the same 0–1000 scale.
-  quad?: [number, number][];
 };
 
 type TextRow = {
@@ -39,15 +37,7 @@ export function readTextRegions(value: unknown, source: string): TextRegion[] {
     if (!text) return [];
     const [top, left, bottom, right] = region.box_2d as TextRegion["box_2d"];
     if (bottom <= top || right <= left) return [];
-    const quad = Array.isArray(region.quad) && region.quad.length === 4 &&
-      region.quad.every((point: unknown) => Array.isArray(point) && point.length === 2 &&
-        point.every((n: unknown) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1000))
-      ? (region.quad as unknown[][]).map((point): [number, number] => [
-          point[0] as number,
-          point[1] as number,
-        ])
-      : undefined;
-    return [{ text, box_2d: [top, left, bottom, right], ...(quad ? { quad } : {}) }];
+    return [{ text, box_2d: [top, left, bottom, right] }];
   });
 }
 

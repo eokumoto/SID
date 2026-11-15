@@ -12,7 +12,6 @@ type OverlayPlacement = {
   top: number;
   width: number;
   height: number;
-  angle: number;
 };
 
 function overlapArea(first: OverlayPlacement, second: OverlayPlacement) {
@@ -23,24 +22,10 @@ function overlapArea(first: OverlayPlacement, second: OverlayPlacement) {
   return Math.max(0, right - left) * Math.max(0, bottom - top);
 }
 
-function placeRegions(regions: TextRegion[], width: number, height: number) {
+function placeRegions(regions: TextRegion[]) {
   const placed = regions.map((region): OverlayPlacement => {
-    if (region.quad?.length === 4 && width && height) {
-      const points = region.quad.map(([x, y]) => ({ x: (x / 1000) * width, y: (y / 1000) * height }));
-      const center = points.reduce((sum, point) => ({ x: sum.x + point.x / 4, y: sum.y + point.y / 4 }), { x: 0, y: 0 });
-      const edgeWidth = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
-      const edgeHeight = Math.hypot(points[2].x - points[1].x, points[2].y - points[1].y);
-      return {
-        region,
-        left: (center.x / width) * 100,
-        top: (center.y / height) * 100,
-        width: (edgeWidth / width) * 100,
-        height: (edgeHeight / height) * 100,
-        angle: (Math.atan2(points[1].y - points[0].y, points[1].x - points[0].x) * 180) / Math.PI,
-      };
-    }
     const [top, left, bottom, right] = region.box_2d;
-    return { region, left: (left + right) / 20, top: (top + bottom) / 20, width: (right - left) / 10, height: (bottom - top) / 10, angle: 0 };
+    return { region, left: (left + right) / 20, top: (top + bottom) / 20, width: (right - left) / 10, height: (bottom - top) / 10 };
   });
   return placed.reduce<{ placements: OverlayPlacement[]; removed: number }>((resolved, placement) => {
     const previous = resolved.placements.find((candidate) => {
@@ -92,7 +77,7 @@ function TextOverlay({ placement, font }: { placement: OverlayPlacement; font: s
     };
   }, [placement.region.text, font]);
   return (
-    <div ref={box} className="photo-text-region" style={{ left: `${placement.left}%`, top: `${placement.top}%`, width: `${placement.width}%`, height: `${placement.height}%`, transform: `translate(-50%, -50%) rotate(${placement.angle}deg)`, fontFamily: font }}>
+    <div ref={box} className="photo-text-region" style={{ left: `${placement.left}%`, top: `${placement.top}%`, width: `${placement.width}%`, height: `${placement.height}%`, transform: "translate(-50%, -50%)", fontFamily: font }}>
       <span ref={text}>{placement.region.text}</span>
     </div>
   );
@@ -103,13 +88,11 @@ export const SWIPE_DISTANCE = 60;
 export function PhotoView({
   url,
   regions = [],
-  onNewPhoto,
   onOverlayRemoved,
   onSwipeBack,
 }: {
   url: string;
   regions?: TextRegion[];
-  onNewPhoto?: () => void;
   onOverlayRemoved?: () => void;
   onSwipeBack?: () => void;
 }) {
@@ -124,13 +107,11 @@ export function PhotoView({
   const settings = useReaderSettings();
   const fitted = fitPhoto(imageSize, frameSize);
   const overlayLayout = useMemo(
-    () => placeRegions(regions, fitted?.width ?? 0, fitted?.height ?? 0),
-    [regions, fitted?.width, fitted?.height],
+    () => placeRegions(regions),
+    [regions],
   );
   const placements = overlayLayout.placements;
   const reportedRemoval = useRef(false);
-  const photoIsTilted = placements.length > 0 &&
-    placements.filter((placement) => Math.abs(placement.angle) > 30).length > placements.length / 2;
   const zoom = (factor: number) =>
     setTransform((t) => ({
       ...t,
@@ -259,12 +240,6 @@ export function PhotoView({
           )}
         </div>
       </div>
-      {photoIsTilted && (
-        <div className="tilted-photo-banner" role="status">
-          <span>Photo is tilted. Retake for best results</span>
-          {onNewPhoto && <button type="button" onClick={onNewPhoto}>New photo</button>}
-        </div>
-      )}
       <div className="photo-toolbar">
         {regions.length ? (
           <div className="segment original-toggle">

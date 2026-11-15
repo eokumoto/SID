@@ -10,13 +10,16 @@ import { ScanImage } from "./ui/scan-image";
 import { PhotoView, SWIPE_DISTANCE } from "./photo-view";
 import { ListenPlayer } from "./listen-player";
 
-export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView = "text", initialSummary = false, onNewPhoto, onOverlayRemoved }: {
+export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView = "text", initialSummary = false, onOverlayRemoved }: {
   scan: Scan; settings: ReaderSettings; pro: boolean; onUpgrade: () => void;
-  initialView?: "text" | "photo"; initialSummary?: boolean; onNewPhoto?: () => void;
+  initialView?: "text" | "photo"; initialSummary?: boolean;
   onOverlayRemoved?: (documentId: string) => void;
   notify: (message: string) => void;
 }) {
   const [view, setView] = useState<"text" | "photo">(initialView);
+  // A signed photo URL can expire while the reader is open; fall back to the placeholder.
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const photoUrl = photoFailed ? "" : scan.photoUrl;
   const [listening, setListening] = useState(false);
   const [word, setWord] = useState<{ start: number; length: number } | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(initialSummary);
@@ -66,20 +69,30 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
   // Set only by a swipe, so the incoming view slides in from that side; taps switch without animating.
   const [swipeIn, setSwipeIn] = useState<"from-right" | "from-left" | null>(null);
   const openPhoto = () => { setView("photo"); setSummaryOpen(false); setSwipeIn(null); };
-  // If a Pro tag would push Listen/Summary past one line, show the tag as a star instead.
+  // Fit the toggle box to its content: if Listen/Summary wrap below Text/Photo, stack them
+  // (so the box hugs the widest row instead of spanning the full width). Then, if a Pro tag
+  // would push Listen/Summary past one line, show the tag as a star instead.
+  const top = useRef<HTMLDivElement>(null);
   const actions = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const element = actions.current;
-    if (!element || pro) return;
+    const box = top.current;
+    const row = actions.current;
+    const toggle = box?.querySelector<HTMLElement>(".view-toggle");
+    const container = box?.parentElement;
+    if (!box || !row || !toggle || !container) return;
     const fit = () => {
-      element.classList.remove("compact-tags");
-      const overflows = [...element.querySelectorAll<HTMLElement>(".reader-action")]
+      box.classList.remove("stacked");
+      row.classList.remove("compact-tags");
+      box.classList.toggle("stacked", row.offsetTop > toggle.offsetTop + 2);
+      if (pro) return;
+      const overflows = [...row.querySelectorAll<HTMLElement>(".reader-action")]
         .some(button => button.scrollWidth > button.clientWidth + 1);
-      element.classList.toggle("compact-tags", overflows);
+      row.classList.toggle("compact-tags", overflows);
     };
     fit();
+    // Watch the reader (not the box itself), since fitting changes the box's own size.
     const observer = new ResizeObserver(fit);
-    observer.observe(element);
+    observer.observe(container);
     void document.fonts?.ready.then(fit);
     return () => observer.disconnect();
   }, [pro, settings]);
@@ -110,7 +123,7 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
 
   return <section className={`reader-screen ${view === "photo" ? "show-photo" : ""} ${listening ? "has-listen-player" : ""} ${swipeIn ? `swipe-${swipeIn}` : ""}`} aria-label="Reader" onTouchStart={startSwipe} onTouchEnd={endSwipe} onTouchCancel={() => { swipeStart.current = null; }}>
     <div className="reader-meta">{scan.sample && <span className="sample-label">Sample</span>}</div>
-    <div className="reader-top reader-toggle-sticky">
+    <div className="reader-top reader-toggle-sticky" ref={top}>
       <div className="segment view-toggle" aria-label="Reader view">
         <button type="button" aria-pressed={view === "text"} onClick={() => { setView("text"); setSwipeIn(null); }}><Icon name="document" />Text</button>
         <button type="button" aria-pressed={view === "photo"} onClick={openPhoto}><Icon name="photo" />Photo</button>
@@ -124,7 +137,6 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
         <button type="button" className={`reader-action ${summaryOpen ? "active" : ""} ${pro && unavailable ? "unavailable" : ""}`} aria-expanded={summaryOpen} onClick={() => void toggleSummary()}><Icon name="summary" />Summary{!pro && <span className="pro-tag"><span className="pro-tag-label">Pro</span><Icon name="star" /></span>}</button>
       </div>
     </div>
-    {scan.warnings?.some(warning => warning === "vision_disabled" || warning === "vision_unavailable") && <p className="sample-label" role="status">Second read unavailable; check the original.</p>}
     {view === "text" ? <>
       <div className="reader-split">
         <article className="reader-panel" aria-label="Transcribed text"><div className="reader-copy">{articleBlocks}</div></article>
@@ -134,14 +146,14 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
             {summaryLoading ? <p role="status">Creating summary<LoadingDots /></p> : bullets && !unavailable ? <><ul>{bullets.map((bullet, i) => <li key={i}>{bullet}</li>)}</ul><p className="summary-note">Full text stays visible.</p></> : <p role="status">{unavailable || summaryMessage || "Select Summary to get started."}</p>}
           </aside>}
           <button type="button" className="original-photo" aria-label="Open original photo" title="Open photo" onClick={openPhoto}>
-            {scan.photoUrl ? <ScanImage src={scan.photoUrl} alt="Original scan" /> : <span className="missing-photo"><Icon name="photo" />Photo unavailable</span>}
+            {photoUrl ? <ScanImage src={photoUrl} alt="Original scan" onError={() => setPhotoFailed(true)} /> : <span className="missing-photo"><Icon name="photo" />Photo unavailable</span>}
           </button>
         </div>
       </div>
       <div className="mobile-reader-tools"><button type="button" className="photo-thumbnail" aria-label="Open original photo" title="Open photo" onClick={openPhoto}>
-        {scan.photoUrl ? <ScanImage src={scan.photoUrl} alt="Original scan thumbnail" /> : <Icon name="photo" />}
+        {photoUrl ? <ScanImage src={photoUrl} alt="Original scan thumbnail" onError={() => setPhotoFailed(true)} /> : <Icon name="photo" />}
       </button></div>
-    </> : <PhotoView key={scan.id} url={scan.photoUrl} regions={scan.textRegions} onNewPhoto={onNewPhoto} onOverlayRemoved={scan.sample ? undefined : () => onOverlayRemoved?.(scan.id)} onSwipeBack={() => { setView("text"); setSwipeIn("from-left"); }} />}
+    </> : <PhotoView key={scan.id} url={photoUrl} regions={scan.textRegions} onNewPhoto={onNewPhoto} onOverlayRemoved={scan.sample ? undefined : () => onOverlayRemoved?.(scan.id)} onSwipeBack={() => { setView("text"); setSwipeIn("from-left"); }} />
     {listening && pro && <ListenPlayer text={fullText} settings={settings} preview={!!scan.sample} onWord={setWord} notify={notify} onClose={() => { setListening(false); setWord(null); }} />}
   </section>;
 }
