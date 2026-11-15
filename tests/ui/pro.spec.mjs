@@ -19,10 +19,13 @@ for (const width of [1440, 720, 390, 320]) test(`Pro screens at ${width}px`, asy
  assert(await page.locator('.upload-dropzone').isVisible(),'dropzone');
  await page.locator('.go-pro').click();
  await page.getByRole('dialog',{name:'SID Pro'}).waitFor();
- assert(await page.locator('.pro-price').textContent().then(t=>t.includes('$3.99')),'price');
+ assert(await page.getByRole('radio',{name:/Annual/}).isChecked(),'annual selected by default');
+ assert(await page.locator('.pro-plans').textContent().then(t=>t.includes('$3.99')&&t.includes('$39.99')),'both prices');
+ await page.getByRole('radio',{name:/Monthly/}).check();
+ assert(await page.getByRole('radio',{name:/Monthly/}).isChecked(),'monthly selectable');
  const dialogBounds=await page.getByRole('dialog',{name:'SID Pro'}).boundingBox();
  assert(dialogBounds.x>=0 && dialogBounds.x+dialogBounds.width<=width+1,'upgrade fits viewport');
- assert(await page.getByRole('dialog',{name:'SID Pro'}).getByRole('button',{name:'Go Pro',exact:true}).isDisabled(),'purchase must be disabled');
+ assert(await page.getByRole('dialog',{name:'SID Pro'}).getByRole('button',{name:'Sign in to go Pro',exact:true}).isEnabled(),'signed-out upgrade asks to sign in');
  await page.getByRole('button',{name:'Close sid pro',exact:true}).click();
  await page.getByRole('dialog').waitFor({state:'detached'});
  await page.getByRole('button',{name:'Settings',exact:true}).click();

@@ -2,6 +2,15 @@ export const FREE_UPLOADS = 10;
 export const PRO_UPLOADS = 150;
 export const PRO_PRICE = "$3.99";
 
+// Display copy only. Stripe price IDs live in server env (STRIPE_PRICE_MONTHLY / STRIPE_PRICE_ANNUAL).
+export type ProPlan = "monthly" | "annual";
+export const PRO_PLANS: Record<ProPlan, { label: string; price: string; per: string; cta: string; badge?: string }> = {
+  monthly: { label: "Monthly", price: PRO_PRICE, per: "month", cta: "$3.99 a month" },
+  // $39.99 vs 12 × $3.99 = $47.88 → 16% saved
+  annual: { label: "Annual", price: "$39.99", per: "year", cta: "$39.99 a year", badge: "Save 16%" },
+};
+export const isProPlan = (value: unknown): value is ProPlan => value === "monthly" || value === "annual";
+
 export type Allowance = {
   plan: "free" | "pro";
   limit: number;

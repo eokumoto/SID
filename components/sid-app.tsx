@@ -1024,7 +1024,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           onUpgrade={openPro}
         />
       )}
-      {modal === "pro" && <ProDialog onClose={() => setModal(null)} />}
+      {modal === "pro" && <ProDialog signedIn={!!user} preview={isPreview} onSignIn={() => setModal("login")} onClose={() => setModal(null)} />}
       {modal === "login" && (
         <AuthDialog
           key={passwordRecovery ? "recovery" : "login"}
