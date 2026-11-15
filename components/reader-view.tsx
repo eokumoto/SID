@@ -9,9 +9,9 @@ import { ScanImage } from "./ui/scan-image";
 import { PhotoView } from "./photo-view";
 import { ListenPlayer } from "./listen-player";
 
-export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView = "text", initialSummary = false }: {
+export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView = "text", initialSummary = false, onNewPhoto }: {
   scan: Scan; settings: ReaderSettings; pro: boolean; onUpgrade: () => void;
-  initialView?: "text" | "photo"; initialSummary?: boolean;
+  initialView?: "text" | "photo"; initialSummary?: boolean; onNewPhoto?: () => void;
   notify: (message: string) => void;
 }) {
   const [view, setView] = useState<"text" | "photo">(initialView);
@@ -73,7 +73,8 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
   });
 
   return <section className={`reader-screen ${view === "photo" ? "show-photo" : ""} ${listening ? "has-listen-player" : ""}`} aria-label="Reader">
-    <div className="reader-top">
+    <div className="reader-meta">{scan.sample && <span className="sample-label">Sample</span>}</div>
+    <div className="reader-top reader-toggle-sticky">
       <div className="segment view-toggle" aria-label="Reader view">
         <button type="button" aria-pressed={view === "text"} onClick={() => setView("text")}><Icon name="document" />Text</button>
         <button type="button" aria-pressed={view === "photo"} onClick={openPhoto}><Icon name="photo" />Photo</button>
@@ -86,7 +87,6 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
         }}><Icon name="speaker" />Listen{!pro && <span className="pro-tag">Pro</span>}</button>
         <button type="button" className={`reader-action ${summaryOpen ? "active" : ""} ${pro && unavailable ? "unavailable" : ""}`} aria-expanded={summaryOpen} onClick={() => void toggleSummary()}><Icon name="summary" />Summary{!pro && <span className="pro-tag">Pro</span>}</button>
       </div>
-      {scan.sample && <span className="sample-label reader-sample">Sample</span>}
     </div>
     {scan.warnings?.some(warning => warning === "vision_disabled" || warning === "vision_unavailable") && <p className="sample-label" role="status">Second read unavailable; check the original.</p>}
     {view === "text" ? <>
@@ -105,7 +105,7 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
       <div className="mobile-reader-tools"><button type="button" className="photo-thumbnail" aria-label="Open original photo" title="Open photo" onClick={openPhoto}>
         {scan.photoUrl ? <ScanImage src={scan.photoUrl} alt="Original scan thumbnail" /> : <Icon name="photo" />}
       </button></div>
-    </> : <PhotoView key={scan.id} url={scan.photoUrl} regions={scan.textRegions} />}
+    </> : <PhotoView key={scan.id} url={scan.photoUrl} regions={scan.textRegions} onNewPhoto={onNewPhoto} />}
     {listening && pro && <ListenPlayer text={fullText} settings={settings} preview={!!scan.sample} onWord={setWord} notify={notify} onClose={() => { setListening(false); setWord(null); }} />}
   </section>;
 }

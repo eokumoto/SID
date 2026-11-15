@@ -24,7 +24,8 @@ export type IconName =
   | "summary"
   | "pause"
   | "play"
-  | "warning";
+  | "warning"
+  | "back";
 const paths: Record<IconName, React.ReactNode> = {
   star: <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z" />,
   summary: <path d="M4 6h16M4 10h16M4 14h10M4 18h7" />,
@@ -106,6 +107,7 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v17H6.5A2.5 2.5 0 0 0 4 22zM20 5.5A2.5 2.5 0 0 0 17.5 3H13v17h4.5A2.5 2.5 0 0 1 20 22z" />
     </>
   ),
+  back: <path d="m14 5-7 7 7 7" />,
 };
 export function Icon({
   name,

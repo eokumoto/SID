@@ -33,6 +33,7 @@
   --paper: #e8dfcb;
   --radius: 3px;
   --navbar-height: 104px;
+  --brand-mark: var(--blue);
   --text: var(--ink);
   --page-color: var(--cream);
   color-scheme: light;
@@ -102,6 +103,7 @@ button svg {
 }
 .theme-dark,
 .theme-navy {
+  --brand-mark: var(--amber);
   --text: #ede3cf;
   --muted: #c1b9a9;
   --line: #797260;
@@ -144,6 +146,51 @@ button svg {
   position: relative;
   z-index: 5;
 }
+.reader-back-slot {
+  display: grid;
+  width: 0;
+  margin-right: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(8px);
+  pointer-events: none;
+  transition: width 220ms ease, margin 220ms ease, opacity 160ms ease,
+    transform 220ms ease;
+}
+.reader-back-slot.is-visible {
+  width: 48px;
+  margin-right: 8px;
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.reader-back-button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--brand-mark);
+  transition: background 160ms ease, border-color 160ms ease,
+    color 160ms ease;
+}
+.reader-back-button .icon {
+  width: 26px;
+  height: 26px;
+  stroke-width: 2.4;
+}
+.reader-back-button:hover {
+  background: var(--peach);
+  border-color: var(--line);
+  color: var(--brand-mark);
+}
+.reader-back-button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
 .wordmark {
   display: flex;
   align-items: center;
@@ -162,14 +209,14 @@ button svg {
   width: 64px;
   height: 64px;
   flex-shrink: 0;
-  color: var(--blue);
-  background: var(--peach);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
 }
-.brand-icon .icon {
-  width: 38px;
-  height: 38px;
+.brand-logo-mark {
+  display: block;
+  width: 78%;
+  height: 78%;
+  background: var(--brand-mark);
+  -webkit-mask: url("/sid-lines-squared-navy.png") center / contain no-repeat;
+  mask: url("/sid-lines-squared-navy.png") center / contain no-repeat;
 }
 .brand-copy {
   display: flex;
@@ -249,11 +296,6 @@ button svg {
 }
 .button.destructive:hover {
   background: #8e3527;
-}
-.nav-upload {
-  min-height: 44px;
-  padding: 9px 14px;
-  font-size: calc(14px * var(--text-scale, 1));
 }
 .theme-peach .button:not(.outlined):not(.destructive) {
   background: #24446f;
@@ -543,26 +585,25 @@ button svg {
   min-height: calc(100svh - var(--navbar-height));
   padding: 18px 30px 26px;
 }
-.reader-top {
+.reader-meta {
+  display: flex;
+  justify-content: flex-end;
+  position: relative;
+  min-height: 0;
+}
+.reader-toggle-sticky {
   display: flex;
   align-items: center;
-  justify-content: center;
-  position: relative;
-  min-height: 52px;
-  margin-bottom: 16px;
-}
-.reader-screen > .reader-top {
+  gap: 4px;
   position: sticky;
   z-index: 2;
-  top: 0;
-  margin: 0 -30px 16px;
-  padding: 12px 30px;
-  border-bottom: 1px solid var(--line);
+  top: 10px;
+  align-self: center;
+  margin: 10px 0 16px;
+  padding: 4px;
   background: var(--page-color);
-}
-.reader-top > .sample-label {
-  position: absolute;
-  right: 0;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 2px);
 }
 .segment {
   display: flex;
@@ -598,6 +639,9 @@ button svg {
 }
 .view-toggle button {
   font-size: calc(14px * var(--text-scale, 1));
+  min-width: 0;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 .reader-split {
   display: grid;
@@ -607,7 +651,6 @@ button svg {
   min-height: calc(100svh - var(--navbar-height) - 113px);
 }
 .reader-panel {
-  position: relative;
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -641,13 +684,11 @@ button svg {
   color: var(--ink);
   border-radius: 2px;
 }
-.speaker-button {
-  position: absolute;
-  right: 22px;
-  bottom: 20px;
+.reader-speaker-button {
+  flex: 0 0 auto;
   border-color: transparent;
 }
-.speaker-button[aria-pressed="true"] {
+.reader-speaker-button[aria-pressed="true"] {
   background: var(--blue);
   color: var(--cream);
 }
@@ -721,17 +762,49 @@ button svg {
   justify-content: flex-start;
   background: var(--cream);
   color: var(--ink);
-  overflow: visible;
+  overflow: hidden;
+  text-align: left;
+  transform-origin: center;
 }
 .photo-text-region > span {
-  display: inline-block;
-  flex: none;
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-size: 1px;
   line-height: 1.3;
   letter-spacing: 0.025em;
   word-spacing: 0.08em;
-  white-space: pre;
+  white-space: normal;
+  overflow-wrap: anywhere;
   padding: 0 1px;
+}
+.tilted-photo-banner {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 24px);
+  padding: 8px 10px;
+  border: 1px solid var(--ink);
+  background: var(--cream);
+  color: var(--ink);
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: 1.25;
+  transform: translateX(-50%);
+}
+.tilted-photo-banner button {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border: 0;
+  background: var(--blue);
+  color: var(--cream);
+  font: inherit;
+  font-weight: 700;
 }
 .overlay-unavailable {
   color: var(--muted);
@@ -1436,10 +1509,6 @@ legend {
     width: 40px;
     height: 40px;
   }
-  .brand-icon .icon {
-    width: 26px;
-    height: 26px;
-  }
   .brand-name {
     font-size: calc(22px * var(--text-scale, 1));
   }
@@ -1493,23 +1562,18 @@ legend {
   .reader-screen {
     padding: 0 18px 0;
   }
-  .reader-top {
-    position: sticky;
-    z-index: 2;
-    top: 0;
-    margin: 0 -18px 18px;
-    padding: 18px;
-    border-bottom: 1px solid var(--line);
-    background: var(--page-color);
+  .reader-meta {
+    min-height: 0;
+  }
+  .reader-toggle-sticky {
+    top: 8px;
+    align-self: stretch;
+    margin: 8px 0 18px;
+    padding: 4px;
   }
   .view-toggle {
-    width: 100%;
-  }
-  .reader-top > .sample-label {
-    top: -1px;
-    right: 8px;
-    font-size: calc(9px * var(--text-scale, 1));
-    pointer-events: none;
+    flex: 1;
+    width: auto;
   }
   .segment button {
     min-height: 48px;
@@ -1528,8 +1592,7 @@ legend {
   .reader-lead {
     margin-bottom: 25px !important;
   }
-  .original-photo,
-  .speaker-button {
+  .original-photo {
     display: none;
   }
   .mobile-reader-tools {
@@ -1865,10 +1928,6 @@ legend {
     width: 40px;
     height: 40px;
   }
-  .brand-icon .icon {
-    width: 26px;
-    height: 26px;
-  }
   .brand-name {
     font-size: calc(22px * var(--text-scale, 1));
   }
@@ -1885,10 +1944,6 @@ legend {
     width: 32px;
     height: 32px;
   }
-  .brand-icon .icon {
-    width: 22px;
-    height: 22px;
-  }
   .brand-name {
     font-size: calc(20px * var(--text-scale, 1));
   }
@@ -1904,6 +1959,10 @@ legend {
 }
 .sid-app .view-toggle {
   width: min(100%, 380px);
+}
+.sid-app .view-toggle button {
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 .sid-app .auth-email-row,
 .sid-app .delete-actions,
@@ -1924,6 +1983,10 @@ legend {
 }
 
 @media (max-width: 700px) {
+  .sid-app .reader-toggle-sticky .view-toggle {
+    flex: 1;
+    width: auto;
+  }
   .home-screen {
     padding-top: 34px;
   }
@@ -1987,17 +2050,6 @@ legend {
   }
   .how-to-steps p {
     font-size: calc(17px * var(--text-scale, 1));
-  }
-  .reader-screen > .reader-top {
-    margin: 0 -18px 18px;
-    padding: 18px;
-  }
-  .nav-upload {
-    min-width: 48px;
-    padding: 10px;
-  }
-  .nav-upload span {
-    display: none;
   }
 }
 

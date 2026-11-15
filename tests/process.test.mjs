@@ -57,12 +57,15 @@ function fixture(options = {}) {
   const env = { NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SECRET_KEY: 'secret', GEMINI_API_KEY: 'key', VISION_ENABLED: 'false', ...options.env };
   const route = load('app/api/process/route.ts', {
     '@supabase/supabase-js': { createClient: () => client },
+    ...(options.visionAnnotation ? { 'node:crypto': { createSign: () => ({ update() {}, sign: () => 'fixture-signature' }) } } : {}),
     '../../../lib/accuracy': accuracy,
     '../../../lib/transcription': transcription,
   }, {
     process: { env },
     console: { warn: (...args) => logs.push(args) },
     fetch: async (url, init) => {
+      if (options.visionAnnotation && url === "https://oauth2.googleapis.com/token") return Response.json({ access_token: "fixture-vision-token" });
+      if (options.visionAnnotation && url.startsWith("https://vision.googleapis.com/")) return Response.json({ responses: [{ fullTextAnnotation: options.visionAnnotation }] });
       calls++;
       providerUrls.push(url);
       assert.ok(!url.includes('key='));
@@ -273,4 +276,24 @@ test('the request throttle supplies Retry-After without calling AI or charging a
   assert.deepEqual(await response.json(),{error:'rate_limit'});
   assert.equal(f.stats().calls,0);assert.equal(f.writes.length,0);
   assert.equal(scanErrorCopy('rate_limit').canRetry,true);
+});
+
+
+test('merged Vision geometry enriches exact Gemini lines without replacing Gemini wording', async () => {
+  const vertices = [{ x: 10, y: 10 }, { x: 90, y: 12 }, { x: 90, y: 20 }, { x: 10, y: 18 }];
+  for (const visionText of [result.source_text, 'Room 204 costs $8.']) {
+    const f = fixture({
+      env: { VISION_ENABLED: 'true', GOOGLE_CLOUD_CREDENTIALS: JSON.stringify({ client_email: 'fixture@example.test', private_key: 'fixture' }) },
+      outputs: [JSON.stringify({ ...result, text_regions: [{ text: result.source_text, box_2d: [100, 100, 200, 900] }] })],
+      visionAnnotation: { text: visionText, pages: [{ width: 100, height: 100, blocks: [{ paragraphs: [{ words: [{ boundingBox: { vertices }, symbols: [{ text: visionText, property: { detectedBreak: { type: 'LINE_BREAK' } } }] }] }] }] }] },
+    });
+    const response = await f.run();
+    assert.equal(response.status, 200);
+    const doc = (await response.json()).document;
+    assert.equal(doc.ocr_text, result.source_text);
+    assert.equal(doc.ocr_source, 'gemini');
+    assert.deepEqual(doc.warnings, []);
+    if (visionText === result.source_text) assert.deepEqual(doc.text_regions[0].quad, [[100,100],[900,120],[900,200],[100,180]]);
+    else assert.equal(doc.text_regions[0].quad, undefined);
+  }
 });
