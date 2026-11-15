@@ -63,7 +63,9 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
     finally { summaryRequest.current = false; setSummaryLoading(false); }
   }
 
-  const openPhoto = () => { setView("photo"); setSummaryOpen(false); };
+  // Set only by a swipe, so the incoming view slides in from that side; taps switch without animating.
+  const [swipeIn, setSwipeIn] = useState<"from-right" | "from-left" | null>(null);
+  const openPhoto = () => { setView("photo"); setSummaryOpen(false); setSwipeIn(null); };
   // If a Pro tag would push Listen/Summary past one line, show the tag as a star instead.
   const actions = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -94,7 +96,7 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
     if (!start || event.changedTouches.length !== 1) return;
     const dx = event.changedTouches[0].clientX - start.x;
     const dy = event.changedTouches[0].clientY - start.y;
-    if (dx < -SWIPE_DISTANCE && Math.abs(dy) < Math.abs(dx) * 0.5) openPhoto();
+    if (dx < -SWIPE_DISTANCE && Math.abs(dy) < Math.abs(dx) * 0.5) { openPhoto(); setSwipeIn("from-right"); }
   };
   const bullets = summary ?? demoBullets;
   const articleBlocks = fullBlocks.map((text, index) => {
@@ -106,11 +108,11 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
     </p>;
   });
 
-  return <section className={`reader-screen ${view === "photo" ? "show-photo" : ""} ${listening ? "has-listen-player" : ""}`} aria-label="Reader" onTouchStart={startSwipe} onTouchEnd={endSwipe} onTouchCancel={() => { swipeStart.current = null; }}>
+  return <section className={`reader-screen ${view === "photo" ? "show-photo" : ""} ${listening ? "has-listen-player" : ""} ${swipeIn ? `swipe-${swipeIn}` : ""}`} aria-label="Reader" onTouchStart={startSwipe} onTouchEnd={endSwipe} onTouchCancel={() => { swipeStart.current = null; }}>
     <div className="reader-meta">{scan.sample && <span className="sample-label">Sample</span>}</div>
     <div className="reader-top reader-toggle-sticky">
       <div className="segment view-toggle" aria-label="Reader view">
-        <button type="button" aria-pressed={view === "text"} onClick={() => setView("text")}><Icon name="document" />Text</button>
+        <button type="button" aria-pressed={view === "text"} onClick={() => { setView("text"); setSwipeIn(null); }}><Icon name="document" />Text</button>
         <button type="button" aria-pressed={view === "photo"} onClick={openPhoto}><Icon name="photo" />Photo</button>
       </div>
       <div className="reader-actions" ref={actions}>
@@ -139,7 +141,7 @@ export function ReaderView({ scan, notify, settings, pro, onUpgrade, initialView
       <div className="mobile-reader-tools"><button type="button" className="photo-thumbnail" aria-label="Open original photo" title="Open photo" onClick={openPhoto}>
         {scan.photoUrl ? <ScanImage src={scan.photoUrl} alt="Original scan thumbnail" /> : <Icon name="photo" />}
       </button></div>
-    </> : <PhotoView key={scan.id} url={scan.photoUrl} regions={scan.textRegions} onNewPhoto={onNewPhoto} onOverlayRemoved={scan.sample ? undefined : () => onOverlayRemoved?.(scan.id)} onSwipeBack={() => setView("text")} />}
+    </> : <PhotoView key={scan.id} url={scan.photoUrl} regions={scan.textRegions} onNewPhoto={onNewPhoto} onOverlayRemoved={scan.sample ? undefined : () => onOverlayRemoved?.(scan.id)} onSwipeBack={() => { setView("text"); setSwipeIn("from-left"); }} />}
     {listening && pro && <ListenPlayer text={fullText} settings={settings} preview={!!scan.sample} onWord={setWord} notify={notify} onClose={() => { setListening(false); setWord(null); }} />}
   </section>;
 }

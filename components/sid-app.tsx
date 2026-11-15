@@ -11,6 +11,7 @@ import {
 } from "@/lib/settings";
 import { sampleHistory, sampleScan, proSampleScan } from "@/lib/sample-scans";
 import { useAllowance } from "@/lib/use-allowance";
+import { useOneLineLabels } from "@/lib/use-one-line";
 import { ProDialog } from "./pro-dialog";
 import type { ReaderSettings, Scan } from "@/lib/ui-types";
 import { Icon } from "./ui/icon";
@@ -107,6 +108,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
   const picker = useRef<HTMLInputElement>(null);
+  const appRoot = useRef<HTMLDivElement>(null);
   const pendingImport = useRef(false);
   const pendingFailures = useRef(0);
   const importPendingScanRef = useRef<(destination: User) => void>(() => {});
@@ -728,6 +730,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     dark: "#22232B",
     navy: "#1F2A44",
   }[settings.background];
+  useOneLineLabels(appRoot, settings);
   // Match the phone's status/browser bar to the navbar (page color with 8% accent, as in globals.css).
   useEffect(() => {
     const accent = settings.background === "dark" || settings.background === "navy" ? "#F6D88A" : "#2F4B7C";
@@ -778,6 +781,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   } as CSSProperties;
   return (
     <div
+      ref={appRoot}
       className={`sid-app ${settings.background === "dark" ? "theme-dark" : ""} ${settings.background === "navy" ? "theme-navy" : ""} ${settings.background === "peach" ? "theme-peach" : ""}`}
       style={style}
     >

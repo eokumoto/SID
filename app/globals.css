@@ -2183,3 +2183,47 @@ legend {
 .compact-tags .reader-action .pro-tag { display: inline-grid; place-items: center; padding: 2px; }
 .compact-tags .reader-action .pro-tag .icon { display: block; }
 .compact-tags .reader-action .pro-tag-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* One-line labels: controls never wrap or break mid-word. Long running text (reader, dialogs) still wraps. */
+.sid-app :is(button, .button, .upload-counter, .sample-label, .pro-tag, .failed-label),
+.sid-app .segment button {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+/* The large upload box may wrap, but only between words. */
+.sid-app .upload-dropzone,
+.sid-app .upload-dropzone > span:not(.button) {
+  white-space: normal;
+  overflow-wrap: normal;
+}
+/* Navbar stays on one row; useOneLineLabels adds .nav-compact, then .nav-minimal, when it runs out of room. */
+.navbar,
+.navbar nav {
+  flex-wrap: nowrap;
+}
+.navbar nav {
+  min-width: 0;
+}
+.navbar.nav-compact .brand-subtitle,
+.navbar.nav-compact .nav-item span,
+.navbar.nav-compact .counter-desktop,
+.navbar.nav-compact .pro-desktop-label,
+.navbar.nav-minimal .brand-copy,
+.navbar.nav-minimal .pro-mobile-label {
+  display: none;
+}
+.navbar.nav-compact .counter-mobile {
+  display: inline;
+}
+.navbar.nav-compact .nav-item,
+.navbar.nav-compact .go-pro {
+  min-width: 48px;
+  justify-content: center;
+}
+
+/* Swipe between Text and Photo: the incoming view slides in slightly from the side the finger moved toward. */
+.reader-screen { overflow-x: clip; }
+.swipe-from-right > :is(.reader-split, .photo-view) { animation: swipe-from-right 240ms ease-out; }
+.swipe-from-left > :is(.reader-split, .photo-view) { animation: swipe-from-left 240ms ease-out; }
+@keyframes swipe-from-right { from { transform: translateX(36px); opacity: 0.3; } to { transform: none; opacity: 1; } }
+@keyframes swipe-from-left { from { transform: translateX(-36px); opacity: 0.3; } to { transform: none; opacity: 1; } }
