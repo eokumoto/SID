@@ -33,7 +33,8 @@ function fixture(route, options={}) {
       providers.push({url,init});assert.ok(!url.includes('key='));
       if(url.includes('-tts')){if(options.geminiQuota)return Response.json({error:{code:429,status:'RESOURCE_EXHAUSTED'}},{status:429});return Response.json({candidates:[{content:{parts:[{inlineData:{mimeType:'audio/L16;codec=pcm;rate=24000',data:Buffer.alloc(4800).toString('base64')}}]}}]});}
       if(url.includes('texttospeech')){if(options.ttsDisabled)return Response.json({error:{code:403,status:'PERMISSION_DENIED',message:'Cloud Text-to-Speech API has not been used in project 1 before or it is disabled.',details:[{reason:'SERVICE_DISABLED'}]}},{status:403});if(options.hdFails&&init.body.includes('Chirp3'))return new Response('{}',{status:400});return Response.json({audioContent:'AAAA',timepoints:[{markName:'w0',timeSeconds:0},{markName:'w1',timeSeconds:.3}]});}
-      return Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({bullets:options.bullets??bullets})}]}}]});
+      const answer=options.answers?options.answers[Math.min(providers.length-1,options.answers.length-1)]:options.bullets??bullets;
+      return Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({bullets:answer})}]}}]});
     },
   });
   const run=(body=route.includes('summary')?{documentId:id}:{text:'Hello world',voice:'Calm'},token=true)=>{
@@ -85,6 +86,21 @@ test('Summary keeps protected dates, times and numbers and caches by source',asy
 });
 test('Summary rejects changed or missing values instead of displaying a risky result',async()=>{
   const f=fixture('app/api/summary/route.ts',{bullets:['Move out by Dec 19 at 5 PM.','Leave your key.','Stored for 30 days.']});assert.equal((await f.run()).status,502);assert.equal(f.writes.length,0);
+});
+const housing="Campus housing update\n\nMove-out for winter break is Dec 18 by 5 PM. Leave your key at the front desk before you leave campus. Please check your room carefully and take your belongings with you. Make sure windows are closed, lights are switched off, and any personal appliances are unplugged.\n\nRooms will be checked on Dec 19. Items left behind will be stored for 30 days. Contact the housing office if you have questions about leaving your room or collecting stored belongings. Staff can explain the process and help you find the information you need before you leave.";
+const housingBullets=['Move out by Dec 18, 5 PM.','Leave your key at the front desk.','Rooms will be checked on Dec 19. Items left behind will be stored for 30 days.'];
+test('Summary accepts a real summary that leaves out sentences',async()=>{
+  const f=fixture('app/api/summary/route.ts',{source:housing,bullets:housingBullets});const response=await f.run();assert.equal(response.status,200);assert.deepEqual((await response.json()).bullets,housingBullets);assert.equal(f.providers.length,1);
+});
+test('Summary retries once when a date is dropped and keeps the corrected answer',async()=>{
+  const f=fixture('app/api/summary/route.ts',{source:housing,answers:[['Move out by 5 PM.','Leave your key at the front desk.','Rooms are checked on Dec 19.'],housingBullets]});const response=await f.run();assert.equal(response.status,200);assert.deepEqual((await response.json()).bullets,housingBullets);assert.equal(f.providers.length,2);assert.match(JSON.parse(f.providers[1].init.body).systemInstruction.parts[0].text,/Dec 18/);
+});
+test('Summary rejects invented values after its retry',async()=>{
+  const f=fixture('app/api/summary/route.ts',{source:housing,bullets:['Move out by Dec 18, 5 PM.','Pay a $50 fee.','Rooms will be checked on Dec 19.']});assert.equal((await f.run()).status,502);assert.equal(f.providers.length,2);assert.equal(f.writes.length,0);
+});
+test('Summary check ignores ordinary words after "room"',()=>{
+  assert.equal(JSON.stringify(accuracy.checkSummary(housing,housingBullets.join('\n'))),'[]');
+  assert.equal(JSON.stringify(accuracy.checkSummary('Meet in Room 204 on Jan 5 at 3:30 pm. '+housing,'Meet in Room 210 on Jan 5 at 3:30 pm. Move out Dec 18 by 5 PM; checks Dec 19.')),'["Room 210"]');
 });
 test('Listen uses the Chirp 3 HD voice and returns no marks so the client estimates timing',async()=>{
   const f=fixture('app/api/speak/route.ts');const response=await f.run({text:'Hello <world>',voice:'Warm'});assert.equal(response.status,200);const body=await response.json();

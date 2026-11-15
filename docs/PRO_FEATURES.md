@@ -32,6 +32,16 @@ Listen uses Google Chirp 3: HD voices (Calm = Achernar, Clear = Iapetus, Warm = 
 
 Summary keeps the full transcription on screen. It produces 3–5 bullets and checks protected dates, times, numbers, prices, and candidate names before returning a result. These checks do not prove semantic accuracy. Menus, lists, schedules, and documents under 80 words receive a short explanation instead. Classification is conservative and heuristic. Summaries are cached by document and source hash. A failed summary never changes or charges an upload. Close and reopen Summary to retry a transient failure.
 
+## Account page
+
+The profile menu opens **Account**. Users can change their display name (saved as `display_name` in Supabase user metadata, because Google rewrites `name` on each sign-in), see their plan and renewal or end date, and cancel Pro.
+
+- `GET /api/billing/subscription` returns the plan, entitlement expiry and the live Stripe subscription (falls back to the `stripe_subscriptions` row if Stripe is unreachable).
+- `POST /api/billing/subscription` with `{ "action": "cancel" }` sets `cancel_at_period_end` in Stripe, so Pro stays until the paid period ends. `{ "action": "resume" }` undoes it. The webhook still grants and revokes the entitlement.
+- `POST /api/billing/portal` opens the Stripe Customer Portal for card changes, invoices and cancellation, and returns to `/?view=account`.
+
+All three verify the Supabase bearer token and act only on the caller's own `stripe_subscriptions` row. Keys come from `STRIPE_SECRET_KEY` (and optional `STRIPE_PORTAL_CONFIGURATION`). Pro granted by an administrator with no Stripe subscription shows its end date and no cancel button.
+
 ## Review previews
 
 All preview states are visibly labeled Sample and do not grant real Pro access or run real uploads:
@@ -44,6 +54,8 @@ All preview states are visibly labeled Sample and do not grant real Pro access o
 - `/?preview=limit`: exhausted Free allowance.
 - `/?preview=pro-limit`: exhausted Pro allowance.
 - `/?preview=upgrade`: upgrade dialog.
+- `/?preview=account`: Free account page.
+- `/?preview=pro-account`: Pro account page with cancel and keep-Pro flow.
 
 ## Verification
 
