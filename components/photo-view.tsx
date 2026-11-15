@@ -12,6 +12,7 @@ type OverlayPlacement = {
   top: number;
   width: number;
   height: number;
+  vertical: boolean;
 };
 
 function overlapArea(first: OverlayPlacement, second: OverlayPlacement) {
@@ -25,7 +26,17 @@ function overlapArea(first: OverlayPlacement, second: OverlayPlacement) {
 function placeRegions(regions: TextRegion[]) {
   const placed = regions.map((region): OverlayPlacement => {
     const [top, left, bottom, right] = region.box_2d;
-    return { region, left: (left + right) / 20, top: (top + bottom) / 20, width: (right - left) / 10, height: (bottom - top) / 10 };
+    const width = (right - left) / 10;
+    const height = (bottom - top) / 10;
+    return {
+      region,
+      left: (left + right) / 20,
+      top: (top + bottom) / 20,
+      width,
+      height,
+      // Vertical source text needs a horizontal reading line inside a rotated box.
+      vertical: height > width * 1.35,
+    };
   });
   return placed.reduce<{ placements: OverlayPlacement[]; removed: number }>((resolved, placement) => {
     const previous = resolved.placements.find((candidate) => {
@@ -76,8 +87,13 @@ function TextOverlay({ placement, font }: { placement: OverlayPlacement; font: s
       document.fonts.removeEventListener("loadingdone", fit);
     };
   }, [placement.region.text, font]);
+  const boxWidth = placement.vertical ? placement.height : placement.width;
+  const boxHeight = placement.vertical ? placement.width : placement.height;
   return (
-    <div ref={box} className="photo-text-region" style={{ left: `${placement.left}%`, top: `${placement.top}%`, width: `${placement.width}%`, height: `${placement.height}%`, transform: "translate(-50%, -50%)", fontFamily: font }}>
+    <div ref={box} className={`photo-text-region${placement.vertical ? " vertical" : ""}`} style={{
+      left: `${placement.left}%`, top: `${placement.top}%`, width: `${boxWidth}%`, height: `${boxHeight}%`,
+      transform: `translate(-50%, -50%)${placement.vertical ? " rotate(-90deg)" : ""}`, fontFamily: font,
+    }}>
       <span ref={text}>{placement.region.text}</span>
     </div>
   );
