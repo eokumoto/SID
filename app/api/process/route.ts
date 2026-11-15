@@ -303,6 +303,24 @@ async function processRequest(request: Request, deadline: AbortSignal) {
   const { data: userData, error: userError } = await supabase.auth.getUser(token);
   if (userError || !userData.user) return json({ error: "server" }, 401);
   const userId = userData.user.id;
+  // Guests (anonymous sessions) don't keep photos: once a read finishes, success or
+  // failure, the original is removed from Storage. The browser keeps its own copy for
+  // retries and for importing the scan if the guest later signs in.
+  const isGuest = userData.user.is_anonymous === true;
+  const discardGuestPhoto = async (path: string) => {
+    if (!isGuest) return;
+    try {
+      const cleanup = createClient(url, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(3000) }) },
+      });
+      const { error } = await cleanup.storage.from("scans").remove([path]);
+      if (error) throw error;
+      await cleanup.from("documents").update({ image_path: null }).eq("id", documentId).eq("user_id", userId);
+    } catch {
+      console.error("guest_photo_cleanup_failed", { documentId });
+    }
+  };
   const { data: document, error: documentError } = await supabase.from("documents").select("*").eq("id", documentId).eq("user_id", userId).maybeSingle();
   if (documentError) return json({ error: "server" }, 500);
   if (!document) return json({ error: "server" }, 404);
@@ -334,6 +352,7 @@ async function processRequest(request: Request, deadline: AbortSignal) {
       });
       await cleanup.rpc("finish_pro_scan", { document_id: documentId, owner_id: userId, expected_attempt: attemptId, outcome: { error } });
     } catch { /* Stale claims can be recovered after two minutes. */ }
+    await discardGuestPhoto(expectedPath);
     return json({ error }, status);
   };
   try {
@@ -374,7 +393,8 @@ async function processRequest(request: Request, deadline: AbortSignal) {
     });
     if (saveError) return fail("server", 500);
     if (!completion?.document) return json({ error: "server" }, 409);
-    return json({ document: completion.document });
+    await discardGuestPhoto(expectedPath);
+    return json({ document: isGuest ? { ...completion.document, image_path: null } : completion.document });
   } catch (error) {
     const code = deadline.aborted
       ? "timeout"

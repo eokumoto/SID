@@ -15,7 +15,7 @@ export default function PrivacyPage() {
       }}
     >
       <h1>Privacy Policy</h1>
-      <p>Last updated: November 14, 2026</p>
+      <p>Last updated: November 15, 2026</p>
       <p>
         SID (Simplified Information Display) is a student hackathon project that
         turns photos of text into easier-to-read text.
@@ -24,9 +24,11 @@ export default function PrivacyPage() {
       <h2>What we collect</h2>
       <ul>
         <li>
-          <b>Photos you upload.</b> If you are not signed in, your photo and
-          its text are stored under a temporary guest session so SID can read
-          it. They are not linked to any account.
+          <b>Photos you upload.</b> If you are not signed in, SID uses a
+          temporary guest session. Your photo is deleted from our servers as
+          soon as it has been read. The extracted text stays with that guest
+          session, and a copy of the scan is kept in your browser so you can
+          save it if you sign in.
         </li>
         <li>
           <b>If you sign in with Google or email:</b> your name, email address
@@ -40,15 +42,19 @@ export default function PrivacyPage() {
 
       <h2>How photos are processed</h2>
       <p>
-        To read the text, your photo is sent to Google Cloud Vision and the
-        Google Gemini API. Google&apos;s terms may allow it to use content sent to
+        To read the text, your photo is sent to the Google Gemini API, and to
+        Google Cloud Vision when that second check is turned on. Summaries are
+        also made with Gemini, and Listen sends the text to Google Cloud
+        Text-to-Speech. Google&apos;s terms may allow it to use content sent to
         the free Gemini API to improve its services. Please do not upload
         private documents, IDs, medical or financial papers.
       </p>
 
       <h2>Where data is stored</h2>
       <p>
-        Accounts and saved scans are stored with Supabase. Only you can see your
+        Accounts and saved scans are stored with Supabase. Free accounts and
+        guests can read 10 photos a day, so we keep a daily count of your
+        scans. Only you can see your
         saved scans. The site is hosted on Vercel.
       </p>
 
