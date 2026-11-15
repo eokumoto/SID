@@ -42,22 +42,25 @@ function placeRegions(regions: TextRegion[], width: number, height: number) {
     const [top, left, bottom, right] = region.box_2d;
     return { region, left: (left + right) / 20, top: (top + bottom) / 20, width: (right - left) / 10, height: (bottom - top) / 10, angle: 0 };
   });
-  return placed.reduce<OverlayPlacement[]>((resolved, placement) => {
-    const previous = resolved.find((candidate) => {
+  return placed.reduce<{ placements: OverlayPlacement[]; removed: number }>((resolved, placement) => {
+    const previous = resolved.placements.find((candidate) => {
       const intersection = overlapArea(candidate, placement);
       return intersection > 0.15 * Math.min(candidate.width * candidate.height, placement.width * placement.height);
     });
-    if (!previous) return [...resolved, placement];
+    if (!previous) return { ...resolved, placements: [...resolved.placements, placement] };
     const previousBottom = previous.top + previous.height / 2;
     const placementBottom = placement.top + placement.height / 2;
     const heightAfterOverlap = placementBottom - previousBottom;
-    if (heightAfterOverlap <= 0.5) return resolved;
-    return [...resolved, {
-      ...placement,
-      top: previousBottom + heightAfterOverlap / 2,
-      height: heightAfterOverlap,
-    }];
-  }, []);
+    if (heightAfterOverlap <= 0.5) return { ...resolved, removed: resolved.removed + 1 };
+    return {
+      ...resolved,
+      placements: [...resolved.placements, {
+        ...placement,
+        top: previousBottom + heightAfterOverlap / 2,
+        height: heightAfterOverlap,
+      }],
+    };
+  }, { placements: [], removed: 0 });
 }
 
 function TextOverlay({ placement, font }: { placement: OverlayPlacement; font: string }) {
@@ -99,10 +102,12 @@ export function PhotoView({
   url,
   regions = [],
   onNewPhoto,
+  onOverlayRemoved,
 }: {
   url: string;
   regions?: TextRegion[];
   onNewPhoto?: () => void;
+  onOverlayRemoved?: () => void;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -112,10 +117,12 @@ export function PhotoView({
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
   const settings = useReaderSettings();
   const fitted = fitPhoto(imageSize, frameSize);
-  const placements = useMemo(
+  const overlayLayout = useMemo(
     () => placeRegions(regions, fitted?.width ?? 0, fitted?.height ?? 0),
     [regions, fitted?.width, fitted?.height],
   );
+  const placements = overlayLayout.placements;
+  const reportedRemoval = useRef(false);
   const photoIsTilted = placements.length > 0 &&
     placements.filter((placement) => Math.abs(placement.angle) > 30).length > placements.length / 2;
   const zoom = (factor: number) =>
@@ -158,6 +165,11 @@ export function PhotoView({
     element?.addEventListener("wheel", wheel, { passive: false });
     return () => { observer.disconnect(); element?.removeEventListener("wheel", wheel); };
   }, [url]);
+  useEffect(() => {
+    if (!overlayLayout.removed || reportedRemoval.current) return;
+    reportedRemoval.current = true;
+    onOverlayRemoved?.();
+  }, [onOverlayRemoved, overlayLayout.removed]);
   if (!url)
     return (
       <div className="photo-view center-stage">

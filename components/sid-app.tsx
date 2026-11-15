@@ -155,6 +155,17 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     setAccountMenu(false);
     setScreen(readerReturnScreen === "history" && signedIn ? "history" : "home");
   };
+  const recordRemovedOverlay = async (documentId: string) => {
+    const supabase = getSupabase();
+    const { data } = await supabase?.auth.getSession() ?? { data: { session: null } };
+    const token = data.session?.access_token;
+    if (!token || isPreview) return;
+    await fetch("/api/overlay-flag", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ documentId }),
+    }).catch(() => undefined);
+  };
 
   useEffect(
     () => () => {
@@ -902,6 +913,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             initialView={preview === "photo" ? "photo" : "text"}
             notify={setNotice}
             onNewPhoto={() => picker.current?.click()}
+            onOverlayRemoved={(documentId) => void recordRemovedOverlay(documentId)}
           />
         )}
         {screen === "history" && signedIn && (

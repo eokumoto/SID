@@ -12,11 +12,13 @@ export function ReaderView({
   notify,
   initialView = "text",
   onNewPhoto,
+  onOverlayRemoved,
 }: {
   scan: Scan;
   initialView?: "text" | "photo";
   notify: (message: string) => void;
   onNewPhoto?: () => void;
+  onOverlayRemoved?: (documentId: string) => void;
 }) {
   const [view, setView] = useState<"text" | "photo">(initialView);
   const speechRun = useRef(0);
@@ -254,6 +256,7 @@ export function ReaderView({
           url={scan.photoUrl}
           regions={scan.textRegions}
           onNewPhoto={onNewPhoto}
+          onOverlayRemoved={scan.sample ? undefined : () => onOverlayRemoved?.(scan.id)}
         />
       )}
     </section>
