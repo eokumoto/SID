@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   if (!token) return reply({ error: "unauthorized" }, 401);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
-  if (!url || !service) return reply({ error: "unavailable" }, 503);
+  if (!url || !service) { console.error("speak: Supabase server key missing"); return reply({ error: "unavailable", reason: "server_not_configured" }, 503); }
   const signal = AbortSignal.timeout(15_000);
   try {
     const supabase = createClient(url, service, {
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     if (error || !data.user) return reply({ error: "unauthorized" }, 401);
     const { data: quota, error: quotaError } = await supabase.rpc("get_upload_allowance", { owner_id: data.user.id });
     const access = !quotaError && readAllowance(quota);
-    if (!access) return reply({ error: "unavailable" }, 503);
+    if (!access) { console.error("speak: get_upload_allowance failed", quotaError?.message); return reply({ error: "unavailable", reason: "allowance_unavailable" }, 503); }
     if (access.plan !== "pro") return reply({ error: "pro_required" }, 403);
     const raw = await request.text();
     if (raw.length > 13000) return reply({ error: "bad_request" }, 400);
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     if (recent.length >= 20) return reply({ error: "limited" }, 429);
     recent.push(now); calls.set(data.user.id, recent);
     const key = process.env.GOOGLE_TTS_API_KEY;
-    if (!key) return reply({ error: "unavailable" }, 503);
+    if (!key) { console.error("speak: GOOGLE_TTS_API_KEY is not set"); return reply({ error: "unavailable", reason: "tts_key_missing" }, 503); }
     const synthesize = (body: object) => fetch("https://texttospeech.googleapis.com/v1beta1/text:synthesize", {
       method: "POST", signal,
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -54,16 +54,26 @@ export async function POST(request: Request) {
     const audioConfig = { audioEncoding: "MP3", speakingRate: 1 };
     const names = SPEECH_VOICES[voice as Voice];
     // Chirp 3: HD first. It has no word timepoints, so the client estimates them (marks: []).
+    // Google's error status (e.g. PERMISSION_DENIED, SERVICE_DISABLED) never includes the key.
+    const googleReason = async (failed: Response, model: string) => {
+      const detail = await failed.json().catch(() => null);
+      const error = detail?.error;
+      const reason = [...(Array.isArray(error?.details) ? error.details.map((d: { reason?: string }) => d?.reason) : []), error?.status]
+        .find((value): value is string => typeof value === "string" && /^[A-Z_]{3,60}$/.test(value)) ?? `HTTP_${failed.status}`;
+      console.error(`speak: Google TTS ${model} failed`, failed.status, reason, typeof error?.message === "string" ? error.message.slice(0, 300) : "");
+      return reason;
+    };
     let response = await synthesize({ input: { text: body.text }, voice: { languageCode: "en-US", name: names.hd }, audioConfig });
     let timed = false;
     if (!response.ok && !signal.aborted) {
+      await googleReason(response, "Chirp 3 HD");
       response = await synthesize({
         input: { ssml: input.ssml }, voice: { languageCode: "en-US", name: names.fallback },
         audioConfig, enableTimePointing: ["SSML_MARK"],
       });
       timed = true;
     }
-    if (!response.ok) return reply({ error: "unavailable" }, 502);
+    if (!response.ok) return reply({ error: "unavailable", reason: await googleReason(response, "Neural2") }, 502);
     const audio = await response.json();
     if (typeof audio.audioContent !== "string" || audio.audioContent.length > 8000000) return reply({ error: "unavailable" }, 502);
     const marks = (timed && Array.isArray(audio.timepoints) ? audio.timepoints : []).flatMap((mark: { markName?: string; timeSeconds?: number }) => {
@@ -76,7 +86,8 @@ export async function POST(request: Request) {
     cache.set(digest, result);
     if (cache.size > 20) cache.delete(cache.keys().next().value!);
     return reply(result);
-  } catch {
-    return reply({ error: "unavailable" }, signal.aborted ? 504 : 502);
+  } catch (error) {
+    console.error("speak: request failed", signal.aborted ? "timeout" : error instanceof Error ? error.message : "");
+    return reply({ error: "unavailable", reason: signal.aborted ? "timeout" : "request_failed" }, signal.aborted ? 504 : 502);
   }
 }

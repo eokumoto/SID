@@ -7,6 +7,16 @@ import { getSupabase } from "@/lib/supabase/client";
 import { Icon } from "./ui/icon";
 import { LoadingDots } from "./ui/loading-dots";
 
+const VOICE_PROBLEMS: Record<string, string> = {
+  tts_key_missing: "voice key not set",
+  SERVICE_DISABLED: "Text-to-Speech API not enabled",
+  BILLING_DISABLED: "billing not enabled",
+  API_KEY_SERVICE_BLOCKED: "key not allowed for Text-to-Speech",
+  API_KEY_INVALID: "invalid voice key",
+  PERMISSION_DENIED: "voice key not allowed",
+  timeout: "timed out",
+};
+
 export function ListenPlayer({ text, settings, preview, onWord, onClose, notify }: {
   text: string; settings: ReaderSettings; preview: boolean;
   onWord: (word: { start: number; length: number } | null) => void;
@@ -112,7 +122,13 @@ export function ListenPlayer({ text, settings, preview, onWord, onClose, notify 
         });
         if (!current()) return;
         if (response.status === 401 || response.status === 403) { setLoading(false); notify("Pro access unavailable. Refresh and try again"); return; }
-        if (!response.ok) throw Error("audio_unavailable");
+        if (!response.ok) {
+          const failure = await response.json().catch(() => null);
+          const reason = typeof failure?.reason === "string" ? failure.reason : `HTTP_${response.status}`;
+          console.warn("SID Listen: cloud voice unavailable, using device voice.", reason);
+          if (current()) { notify(`HD voice unavailable (${VOICE_PROBLEMS[reason] ?? reason}). Using your device’s voice`); device(); }
+          return;
+        }
         const result = await response.json();
         if (!current()) return;
         if (typeof result.audioContent !== "string") throw Error("audio_unavailable");

@@ -31,7 +31,7 @@ function fixture(route, options={}) {
     process:{env:{NEXT_PUBLIC_SUPABASE_URL:'https://sid.test',SUPABASE_SECRET_KEY:'server-key',GEMINI_API_KEY:'gemini-private',GOOGLE_TTS_API_KEY:'tts-private'}},
     fetch:async(url,init)=>{
       providers.push({url,init});assert.ok(!url.includes('key='));
-      if(url.includes('texttospeech')){if(options.hdFails&&init.body.includes('Chirp3'))return new Response('{}',{status:400});return Response.json({audioContent:'AAAA',timepoints:[{markName:'w0',timeSeconds:0},{markName:'w1',timeSeconds:.3}]});}
+      if(url.includes('texttospeech')){if(options.ttsDisabled)return Response.json({error:{code:403,status:'PERMISSION_DENIED',message:'Cloud Text-to-Speech API has not been used in project 1 before or it is disabled.',details:[{reason:'SERVICE_DISABLED'}]}},{status:403});if(options.hdFails&&init.body.includes('Chirp3'))return new Response('{}',{status:400});return Response.json({audioContent:'AAAA',timepoints:[{markName:'w0',timeSeconds:0},{markName:'w1',timeSeconds:.3}]});}
       return Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({bullets:options.bullets??bullets})}]}}]});
     },
   });
@@ -94,6 +94,10 @@ test('Listen falls back to Neural2 with escaped SSML and maps word timepoints wh
   const f=fixture('app/api/speak/route.ts',{hdFails:true});const response=await f.run({text:'Hello <world>',voice:'Warm'});assert.equal(response.status,200);const body=await response.json();
   assert.equal(f.providers.length,2);const sent=JSON.parse(f.providers[1].init.body);assert.equal(sent.voice.name,'en-US-Neural2-C');assert.ok(sent.input.ssml.includes('&lt;world&gt;'));
   assert.equal(body.marks[1].start,6);assert.equal(body.marks[1].time,.3);
+});
+test('Listen tells the client why the cloud voice failed without leaking the key',async()=>{
+  const f=fixture('app/api/speak/route.ts',{ttsDisabled:true});const response=await f.run();assert.equal(response.status,502);const body=await response.json();
+  assert.equal(body.reason,'SERVICE_DISABLED');assert.equal(f.providers.length,2);assert.ok(!JSON.stringify(body).includes('tts-private'));
 });
 test('estimated word marks are ordered, start at each word and fit the audio',()=>{
   const text='Move out by Dec 18, at 5 PM. Leave your key.';const marks=speech.estimateMarks(text,4);
