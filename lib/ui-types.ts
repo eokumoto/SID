@@ -8,7 +8,6 @@ export type ReaderSettings = {
     | "Slightly wide"
     | "Wide";
   background: "cream" | "peach" | "dark" | "navy";
-  reduceMotion: boolean;
 };
 
 export type Scan = {

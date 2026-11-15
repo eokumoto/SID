@@ -5,6 +5,7 @@ import type { Scan } from "@/lib/ui-types";
 import { Icon } from "./ui/icon";
 import { ScanImage } from "./ui/scan-image";
 import { PhotoView } from "./photo-view";
+import { getSupabase } from "@/lib/supabase/client";
 
 export function ReaderView({
   scan,
@@ -17,6 +18,8 @@ export function ReaderView({
 }) {
   const [view, setView] = useState<"text" | "photo">(initialView);
   const speechRun = useRef(0);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const audioUrl = useRef<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const [active, setActive] = useState<{
     block: number;
@@ -27,11 +30,13 @@ export function ReaderView({
   useEffect(
     () => () => {
       speechRun.current += 1;
+      audio.current?.pause();
+      if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
       window.speechSynthesis?.cancel();
     },
     [],
   );
-  function speak() {
+  function speakWithBrowser() {
     if (!("speechSynthesis" in window)) {
       notify("Audio unavailable");
       return;
@@ -78,6 +83,54 @@ export function ReaderView({
       window.speechSynthesis.speak(utterance);
     });
   }
+  async function speak() {
+    if (speaking) {
+      speechRun.current += 1;
+      audio.current?.pause();
+      window.speechSynthesis?.cancel();
+      setSpeaking(false);
+      setActive(null);
+      return;
+    }
+    const text = blocks
+      .map((block) => (block.label ? `${block.label}: ${block.text}` : block.text))
+      .join("\n\n");
+    const supabase = getSupabase();
+    const { data } = await supabase?.auth.getSession() ?? { data: { session: null } };
+    const token = data.session?.access_token;
+    if (!token || text.length > 2000) {
+      speakWithBrowser();
+      return;
+    }
+    try {
+      const response = await fetch("/api/speak", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!response.ok) throw new Error("unavailable");
+      if ("audioSession" in navigator) {
+        const session = navigator as Navigator & { audioSession?: { type?: string } };
+        if (session.audioSession) session.audioSession.type = "playback";
+      }
+      if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
+      audioUrl.current = URL.createObjectURL(await response.blob());
+      const player = new Audio(audioUrl.current);
+      audio.current = player;
+      player.onplay = () => setSpeaking(true);
+      player.onended = () => {
+        setSpeaking(false);
+        setActive(null);
+      };
+      player.onerror = () => {
+        setSpeaking(false);
+        speakWithBrowser();
+      };
+      await player.play();
+    } catch {
+      speakWithBrowser();
+    }
+  }
   return (
     <section
       className={`reader-screen ${view === "photo" ? "show-photo" : ""}`}
@@ -90,6 +143,7 @@ export function ReaderView({
             aria-pressed={view === "text"}
             onClick={() => setView("text")}
           >
+            <Icon name="document" />
             Text
           </button>
           <button
@@ -97,6 +151,7 @@ export function ReaderView({
             aria-pressed={view === "photo"}
             onClick={() => setView("photo")}
           >
+            <Icon name="photo" />
             Photo
           </button>
         </div>

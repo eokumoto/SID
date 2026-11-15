@@ -189,45 +189,48 @@ function imageMime(bytes: Buffer): string | null {
 export async function POST(request: Request) {
   const deadline = AbortSignal.timeout(50_000);
   try { return await processRequest(request, deadline); }
-  catch { return json({ error: deadline.aborted ? "timeout" : "unknown" }, deadline.aborted ? 504 : 500); }
+  catch (error) {
+    console.error("scan_processing_unhandled", error);
+    return json({ error: deadline.aborted ? "timeout" : "server" }, deadline.aborted ? 504 : 500);
+  }
 }
 
 async function processRequest(request: Request, deadline: AbortSignal) {
   const auth = request.headers.get("authorization");
   const token = auth?.match(/^Bearer (.+)$/i)?.[1];
   let payload: unknown;
-  try { payload = await request.json(); } catch { return json({ error: "bad_request" }, 400); }
+  try { payload = await request.json(); } catch { return json({ error: "server" }, 400); }
   const documentId = payload && typeof payload === "object" && !Array.isArray(payload) && Object.keys(payload).length === 1 ? (payload as { documentId?: unknown }).documentId : null;
-  if (!token) return json({ error: "unauthorized" }, 401);
-  if (typeof documentId !== "string" || !UUID.test(documentId)) return json({ error: "bad_request" }, 400);
+  if (!token) return json({ error: "server" }, 401);
+  if (typeof documentId !== "string" || !UUID.test(documentId)) return json({ error: "server" }, 400);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
   const dailyLimit = Number(process.env.DAILY_LIMIT || "20");
-  if (!url || !serviceKey || !Number.isSafeInteger(dailyLimit) || dailyLimit < 1) return json({ error: "service_unavailable" }, 503);
+  if (!url || !serviceKey || !Number.isSafeInteger(dailyLimit) || dailyLimit < 1) return json({ error: "server" }, 503);
   const supabase = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { fetch: (input, init) => fetch(input, { ...init, signal: deadline }) },
   });
   const { data: userData, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !userData.user) return json({ error: "unauthorized" }, 401);
+  if (userError || !userData.user) return json({ error: "server" }, 401);
   const userId = userData.user.id;
   const { data: document, error: documentError } = await supabase.from("documents").select("*").eq("id", documentId).eq("user_id", userId).maybeSingle();
-  if (documentError) return json({ error: "unknown" }, 500);
-  if (!document) return json({ error: "not_found" }, 404);
+  if (documentError) return json({ error: "server" }, 500);
+  if (!document) return json({ error: "server" }, 404);
   if (document.status === "ready") return json({ document });
-  if (!document.image_path) return json({ error: "original_unavailable" }, 409);
+  if (!document.image_path) return json({ error: "server" }, 409);
   const expectedPath = `${userId}/${documentId}.jpg`;
-  if (document.image_path !== expectedPath) return json({ error: "invalid_input" }, 400);
-  if (!process.env.GEMINI_API_KEY) return json({ error: "service_unavailable" }, 503);
+  if (document.image_path !== expectedPath) return json({ error: "server" }, 400);
+  if (!process.env.GEMINI_API_KEY) return json({ error: "server" }, 503);
   const { data: claim, error: claimingError } = await supabase.rpc("claim_scan", { document_id: documentId, owner_id: userId, max_scans: dailyLimit });
-  if (claimingError || !claim) return json({ error: "service_unavailable" }, 503);
+  if (claimingError || !claim) return json({ error: "server" }, 503);
   if (claim.error) {
-    const statuses: Record<string, number> = { not_found: 404, invalid_input: 400, original_unavailable: 409, already_processing: 409, daily_limit: 429 };
-    return json({ error: claim.error }, statuses[claim.error] ?? 500);
+    const busy = claim.error === "already_processing" || claim.error === "daily_limit";
+    return json({ error: busy ? "busy" : "server" }, busy ? 409 : 500);
   }
   if (claim.document?.status === "ready") return json({ document: claim.document });
   const attemptId = claim.document?.attempt_id;
-  if (!attemptId) return json({ error: "unknown" }, 500);
+  if (!attemptId) return json({ error: "server" }, 500);
   const fail = async (error: string, status: number, reason?: string) => {
     console.warn("scan_processing_failed", { documentId, error, ...(reason ? { reason } : {}) });
     try {
@@ -237,15 +240,16 @@ async function processRequest(request: Request, deadline: AbortSignal) {
       });
       await cleanup.from("documents").update({ status: "failed", error }).eq("id", documentId).eq("user_id", userId).eq("status", "processing").eq("attempt_id", attemptId);
     } catch { /* Stale claims can be recovered after two minutes. */ }
-    return json({ error, ...(reason ? { reason } : {}) }, status);
+    return json({ error }, status);
   };
   try {
     const { data: file, error: downloadError } = await supabase.storage.from("scans").download(expectedPath);
-    if (downloadError || !file) return fail("storage_failed", 502);
-    if (file.size === 0 || file.size > MAX_IMAGE_BYTES) return fail("invalid_input", 400);
+    if (downloadError || !file) return fail("server", 502);
+    if (file.size > MAX_IMAGE_BYTES) return fail("too_big", 400);
+    if (file.size === 0) return fail("no_text", 400);
     const bytes = Buffer.from(await file.arrayBuffer());
     const mimeType = imageMime(bytes);
-    if (!mimeType || mimeType !== file.type) return fail("invalid_input", 400);
+    if (!mimeType || mimeType !== file.type) return fail("wrong_type", 400);
     const visionEnabled = process.env.VISION_ENABLED === "true";
     const vision = visionEnabled
       ? readWithVision(bytes, AbortSignal.any([deadline, AbortSignal.timeout(12_000)])).catch(() => null)
@@ -269,11 +273,17 @@ async function processRequest(request: Request, deadline: AbortSignal) {
     if (saveError && ["PGRST204", "42703"].includes(saveError.code)) {
       ({ data: saved, error: saveError } = await save(false));
     }
-    if (saveError) return fail("unknown", 500);
-    if (!saved) return json({ error: "attempt_superseded" }, 409);
+    if (saveError) return fail("server", 500);
+    if (!saved) return json({ error: "busy" }, 409);
     return json({ document: { ...saved, text_regions: textRegions } });
   } catch (error) {
-    const code = deadline.aborted ? "timeout" : error instanceof Error && error.message === "bad_ai_json" ? "bad_ai_json" : "ai_failed";
-    return fail(code, code === "timeout" ? 504 : 502, error instanceof GeminiFailure ? error.reason : undefined);
+    const code = deadline.aborted
+      ? "timeout"
+      : error instanceof GeminiFailure && error.reason === "ai_empty_response"
+        ? "no_text"
+        : error instanceof Error && error.message === "bad_ai_json"
+          ? "no_text"
+          : "server";
+    return fail(code, code === "timeout" ? 504 : 502, error instanceof Error ? error.message : undefined);
   }
 }

@@ -18,7 +18,8 @@ export type IconName =
   | "minus"
   | "plus"
   | "logout"
-  | "mail";
+  | "mail"
+  | "book";
 const paths: Record<IconName, React.ReactNode> = {
   document: (
     <>
@@ -32,8 +33,8 @@ const paths: Record<IconName, React.ReactNode> = {
   ),
   settings: (
     <>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9 7 7m10 10 2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" />
+      <path d="M9 3h6v3h2l2-2 2 2-2 2v2h3v4h-3v2l2 2-2 2-2-2h-2v3H9v-3H7l-2 2-2-2 2-2v-2H2v-4h3V8L3 6l2-2 2 2h2z" />
+      <circle cx="12" cy="12" r="2.5" />
     </>
   ),
   history: (
@@ -88,6 +89,11 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <rect x="3" y="5" width="18" height="14" rx="1" />
       <path d="m3 6 9 7 9-7" />
+    </>
+  ),
+  book: (
+    <>
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v17H6.5A2.5 2.5 0 0 0 4 22zM20 5.5A2.5 2.5 0 0 0 17.5 3H13v17h4.5A2.5 2.5 0 0 1 20 22z" />
     </>
   ),
 };

@@ -114,19 +114,6 @@ export function SettingsPanel({
             )}
           </div>
         </fieldset>
-        <fieldset>
-          <legend>Motion</legend>
-          <label className="motion-setting">
-            <span>Reduce animations</span>
-            <input
-              type="checkbox"
-              checked={settings.reduceMotion}
-              onChange={(event) =>
-                onChange({ ...settings, reduceMotion: event.target.checked })
-              }
-            />
-          </label>
-        </fieldset>
       </div>
     </Dialog>
   );

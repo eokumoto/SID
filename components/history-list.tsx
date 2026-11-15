@@ -143,6 +143,13 @@ export function HistoryList({
     );
   return (
     <section className="history-screen" aria-label="History">
+      <header className="history-heading">
+        <h1>History</h1>
+        <button type="button" className="button" onClick={onUpload}>
+          <Icon name="upload" />
+          Upload
+        </button>
+      </header>
       <ul className="history-list">
         {scans.map((scan) => (
           <HistoryRow

@@ -20,8 +20,13 @@ import { HistoryList } from "./history-list";
 import { AuthDialog } from "./auth-dialog";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { scanStatus } from "@/lib/scan-state";
-import { processingErrorMessage } from "@/lib/scan-errors";
+import { scanErrorCode, scanErrorCopy, type ScanErrorCode } from "@/lib/scan-errors";
 import { originalText, readTextRegions } from "@/lib/transcription";
+import {
+  clearPendingScan,
+  readPendingScan,
+  savePendingScan,
+} from "@/lib/pending-scan";
 
 type Screen = "home" | "processing" | "reader" | "history" | "error";
 const previewScreens: Record<string, Screen> = {
@@ -44,7 +49,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const isPreview = Object.hasOwn(previewScreens, preview);
   const [screen, setScreen] = useState<Screen>(initial);
   const [homeReturn, setHomeReturn] = useState(false);
-  const [modal, setModal] = useState<"settings" | "login" | null>(
+  const [modal, setModal] = useState<"settings" | "login" | "help" | null>(
     preview === "settings" ? "settings" : preview === "login" ? "login" : null,
   );
   const [current, setCurrent] = useState<Scan | null>(
@@ -60,11 +65,14 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
   const picker = useRef<HTMLInputElement>(null);
+  const pendingImport = useRef(false);
+  const pendingFailures = useRef(0);
+  const importPendingScanRef = useRef<(destination: User) => void>(() => {});
   const localPhoto = useRef<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const workRun = useRef(0);
-  const [errorReason, setErrorReason] = useState(
-    preview === "offline" ? "No connection" : "Too blurry",
+  const [errorCode, setErrorCode] = useState<ScanErrorCode>(
+    preview === "offline" ? "network" : "blurry",
   );
   const [notice, setNotice] = useState("");
   const [user, setUser] = useState<User | null>(null);
@@ -149,6 +157,8 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       }
       accountId.current = next?.id ?? null;
       setUser(next);
+      if (next && !next.is_anonymous)
+        window.setTimeout(() => importPendingScanRef.current(next), 0);
     }
     supabase.auth
       .getSession()
@@ -180,6 +190,9 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     };
   }, [isPreview]);
   useEffect(() => {
+    if (!isPreview) void readPendingScan().catch(() => undefined);
+  }, [isPreview]);
+  useEffect(() => {
     if (!user || isPreview) return;
     const supabase = getSupabase();
     if (!supabase) return;
@@ -192,8 +205,20 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       .then(({ data, error }) => {
         if (active) {
           if (error) setNotice("Settings not synced");
-          else if (data?.settings)
-            saveSettings(validateSettings(data.settings));
+          else if (data?.settings) {
+            const normalized = validateSettings(data.settings);
+            saveSettings(normalized);
+            if (
+              typeof data.settings === "object" &&
+              !Array.isArray(data.settings) &&
+              "reduceMotion" in data.settings
+            ) {
+              void supabase.from("profiles").upsert({
+                user_id: user.id,
+                settings: normalized,
+              });
+            }
+          }
         }
       });
     return () => {
@@ -276,12 +301,17 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     };
   }
 
-  async function processDocument(documentId: string, photoUrl: string, run: number) {
+  async function processDocument(
+    documentId: string,
+    photoUrl: string,
+    run: number,
+    sourceFile?: File,
+  ) {
     const supabase = getSupabase();
-    if (!supabase) throw new Error("Not connected");
+    if (!supabase) throw new Error("network");
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
-    if (!token) throw new Error("Not connected");
+    if (!token) throw new Error("network");
     const response = await fetch("/api/process", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -298,25 +328,100 @@ export function SidApp({ preview = "" }: { preview?: string }) {
         if (run !== workRun.current) return;
         const { data: row, error } = await supabase.from("documents").select("*").eq("id", documentId).eq("user_id", sessionData.session!.user.id).maybeSingle();
         if (run !== workRun.current) return;
-        if (error) throw new Error("No connection");
-        if (!row) throw new Error("Scan unavailable");
+        if (error) throw new Error("network");
+        if (!row) throw new Error("server");
         if (row.status === "ready") { body = { document: row }; break; }
-        if (scanStatus(row.status, row.processing_started_at) === "failed") throw new Error(row.error === "timeout" || row.status === "processing" ? "Timed out" : "Couldn’t read this photo");
+        if (scanStatus(row.status, row.processing_started_at) === "failed") throw new Error(row.error === "timeout" || row.status === "processing" ? "timeout" : "server");
       }
     }
     if (!body || typeof body !== "object" || !("document" in body)) {
       const code = body && typeof body === "object" && "error" in body ? (body as { error?: unknown }).error : "";
-      const reason = body && typeof body === "object" && "reason" in body ? body.reason : undefined;
-      throw new Error(processingErrorMessage(code, reason));
+      throw new Error(scanErrorCode(code));
     }
     const scan = resultToScan((body as { document: Parameters<typeof resultToScan>[0] }).document, photoUrl);
     timers.current.forEach(clearTimeout);
     timers.current = [];
     setProcessingId(null);
     setCurrent(scan);
+    if (!user && sourceFile) {
+      const storedScan = { ...scan };
+      delete (storedScan as Partial<Scan>).photoUrl;
+      try {
+        await savePendingScan({
+          createdAt: Date.now(),
+          file: sourceFile,
+          fileName: sourceFile.name,
+          scan: storedScan as Omit<Scan, "photoUrl">,
+        });
+      } catch {
+        // A scan still works when private browser storage is unavailable.
+      }
+    }
     if (user) setRefresh((count) => count + 1);
     setScreen("reader");
   }
+
+  async function importPendingScan(destination: User) {
+    if (pendingImport.current || isPreview) return;
+    pendingImport.current = true;
+    try {
+      const pending = await readPendingScan();
+      if (!pending) return;
+      const supabase = getSupabase();
+      if (!supabase) return;
+      const id = crypto.randomUUID();
+      const imagePath = `${destination.id}/${id}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from("scans")
+        .upload(imagePath, pending.file, {
+          contentType: pending.file.type,
+          upsert: false,
+        });
+      if (uploadError) throw uploadError;
+      const fields = {
+        id,
+        image_path: imagePath,
+        title: pending.scan.title,
+        status: "ready",
+        ocr_text: pending.scan.text,
+        plain_text: pending.scan.text,
+        flags: [],
+        key_terms: [],
+        warnings: pending.scan.warnings ?? [],
+        text_regions: pending.scan.textRegions ?? [],
+      };
+      let { error: insertError } = await supabase
+        .from("documents")
+        .insert(fields);
+      if (insertError?.code === "PGRST204" || insertError?.code === "42703") {
+        ({ error: insertError } = await supabase.from("documents").insert({
+          ...fields,
+          text_regions: undefined,
+        }));
+      }
+      if (insertError) {
+        await supabase.storage.from("scans").remove([imagePath]);
+        throw insertError;
+      }
+      await clearPendingScan();
+      pendingFailures.current = 0;
+      const photoUrl = URL.createObjectURL(pending.file);
+      localPhoto.current = photoUrl;
+      setPhoto(photoUrl);
+      setCurrent({ ...pending.scan, id, imagePath, photoUrl });
+      setRefresh((count) => count + 1);
+    } catch {
+      pendingFailures.current += 1;
+      if (pendingFailures.current > 1) setNotice("Couldn’t save this scan yet");
+    } finally {
+      pendingImport.current = false;
+    }
+  }
+  useEffect(() => {
+    importPendingScanRef.current = (destination) => {
+      void importPendingScan(destination);
+    };
+  });
 
   async function showFile(file?: File) {
     if (!file) return;
@@ -325,11 +430,13 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       return;
     }
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setNotice("Image files only");
+      setErrorCode("wrong_type");
+      setScreen("error");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setNotice("Image too large");
+      setErrorCode("too_big");
+      setScreen("error");
       return;
     }
     stopWork();
@@ -348,11 +455,11 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     setStage("Reading");
     try {
       const supabase = getSupabase();
-      if (!supabase) throw new Error("Not connected");
+      if (!supabase) throw new Error("network");
       let { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
         const { data, error } = await supabase.auth.signInAnonymously();
-        if (error || !data.session) throw new Error("Not connected");
+        if (error || !data.session) throw new Error("network");
         sessionData = { session: data.session };
       }
       const ownerId = sessionData.session.user.id;
@@ -363,7 +470,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
         contentType: file.type,
         upsert: false,
       });
-      if (uploadError) throw new Error("Couldn’t upload photo");
+      if (uploadError) throw new Error("network");
       if (run !== workRun.current) {
         await supabase.storage.from("scans").remove([imagePath]);
         return;
@@ -374,15 +481,15 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       });
       if (insertError) {
         await supabase.storage.from("scans").remove([imagePath]);
-        throw new Error("Couldn’t save scan");
+        throw new Error("server");
       }
       if (run !== workRun.current) return;
       setProcessingId(documentId);
       timers.current.push(setTimeout(() => setStage("Formatting"), 700));
-      await processDocument(documentId, url, run);
+      await processDocument(documentId, url, run, file);
     } catch (error) {
       if (run !== workRun.current) return;
-      setErrorReason(error instanceof Error ? error.message : "Couldn’t read this photo");
+      setErrorCode(scanErrorCode(error instanceof Error ? error.message : "server"));
       setScreen("error");
     }
   }
@@ -525,7 +632,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       timers.current.push(
         setTimeout(() => setStage("Formatting"), 700),
         setTimeout(() => {
-          setErrorReason("Too blurry");
+          setErrorCode("blurry");
           setScreen("error");
         }, 1800),
       );
@@ -545,7 +652,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     timers.current.push(setTimeout(() => setStage("Formatting"), 700));
     void processDocument(documentId, chosen?.photoUrl || photo, run).catch((error) => {
       if (run !== workRun.current) return;
-      setErrorReason(error instanceof Error ? error.message : "Couldn’t read this photo");
+      setErrorCode(scanErrorCode(error instanceof Error ? error.message : "server"));
       setScreen("error");
     });
   }
@@ -588,7 +695,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   } as CSSProperties;
   return (
     <div
-      className={`sid-app ${settings.background === "dark" ? "theme-dark" : ""} ${settings.background === "navy" ? "theme-navy" : ""} ${settings.background === "peach" ? "theme-peach" : ""} ${settings.reduceMotion ? "reduce-motion" : ""}`}
+      className={`sid-app ${settings.background === "dark" ? "theme-dark" : ""} ${settings.background === "navy" ? "theme-navy" : ""} ${settings.background === "peach" ? "theme-peach" : ""}`}
       style={style}
     >
       <a className="skip-link" href="#main">
@@ -612,6 +719,16 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           </span>
         </button>
         <nav aria-label="Main navigation">
+          {screen !== "home" && (
+            <button
+              type="button"
+              className="button nav-upload"
+              onClick={() => picker.current?.click()}
+            >
+              <Icon name="upload" />
+              Upload
+            </button>
+          )}
           {signedIn && (
             <button
               type="button"
@@ -698,17 +815,35 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           <section className="center-stage home-screen" aria-label="Upload">
             <button
               type="button"
-              className="button upload-button"
+              className="upload-dropzone"
               aria-describedby="upload-description"
               onClick={() => picker.current?.click()}
             >
-              <Icon name="upload" />
-              Upload
+              <Icon name="photo" />
+              <span className="upload-drop-title">Drag an image here</span>
+              <span className="upload-or" aria-hidden="true">
+                <i />
+                <b>or</b>
+                <i />
+              </span>
+              <span className="button upload-select">
+                <Icon name="upload" />
+                Select image
+              </span>
+              <span className="upload-format">JPG, PNG or WebP</span>
             </button>
             <p id="upload-description" className="upload-description">
               Upload a photo. We’ll show the words in a clear font with more
               space.
             </p>
+            <button
+              type="button"
+              className="how-to-trigger"
+              onClick={() => setModal("help")}
+            >
+              <span aria-hidden="true">?</span>
+              How to use
+            </button>
           </section>
         )}
         {screen === "processing" && (
@@ -743,7 +878,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             scans={history}
             loading={!isPreview && !!user && historyOwner !== user.id}
             error={historyError}
-            onUpload={home}
+            onUpload={() => picker.current?.click()}
             onOpen={(scan) => {
               setCurrent(scan);
               if (scan.status === "processing" || scan.status === "queued") {
@@ -751,7 +886,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
                 return;
               }
               if (scan.status === "failed") {
-                setErrorReason("Too blurry");
+                setErrorCode("server");
                 setScreen("error");
               } else setScreen("reader");
             }}
@@ -773,13 +908,16 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           >
             <div className="error-icon">
               <Icon
-                name={errorReason === "No connection" ? "offline" : "blur"}
+                name={errorCode === "network" ? "offline" : "blur"}
               />
             </div>
-            <h1>{errorReason}</h1>
-            <button type="button" className="button" onClick={() => retry()}>
-              Try again
-            </button>
+            <h1>{scanErrorCopy(errorCode).title}</h1>
+            <p className="error-detail">{scanErrorCopy(errorCode).detail}</p>
+            {scanErrorCopy(errorCode).canRetry && (
+              <button type="button" className="button" onClick={() => retry()}>
+                Try again
+              </button>
+            )}
             <button
               type="button"
               className="button outlined"
@@ -824,6 +962,54 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             if (message) setNotice(message);
           }}
         />
+      )}
+      {modal === "help" && (
+        <Dialog
+          label="How to use SID"
+          className="how-to-dialog"
+          animateClose
+          onClose={() => setModal(null)}
+        >
+          <h2>How to use SID</h2>
+          <div className="how-to-steps">
+            <article>
+              <div className="how-to-icon">
+                <Icon name="upload" />
+              </div>
+              <div>
+                <h3>1. Add a photo</h3>
+                <p>Drag it in or click Select image</p>
+              </div>
+            </article>
+            <i aria-hidden="true">→</i>
+            <article>
+              <div className="how-to-icon">
+                <Icon name="book" />
+              </div>
+              <div>
+                <h3>2. Read</h3>
+                <p>The words show in a clear font with more space</p>
+              </div>
+            </article>
+            <i aria-hidden="true">→</i>
+            <article>
+              <div className="how-to-icon">
+                <Icon name="settings" />
+              </div>
+              <div>
+                <h3>3. Adjust</h3>
+                <p>Use Settings to change the font, size or color</p>
+              </div>
+            </article>
+          </div>
+          <button
+            type="button"
+            className="button"
+            onClick={() => setModal(null)}
+          >
+            Got it
+          </button>
+        </Dialog>
       )}
       {deleting && (
         <Dialog
