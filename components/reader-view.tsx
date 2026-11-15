@@ -11,10 +11,12 @@ export function ReaderView({
   scan,
   notify,
   initialView = "text",
+  onNewPhoto,
 }: {
   scan: Scan;
   initialView?: "text" | "photo";
   notify: (message: string) => void;
+  onNewPhoto?: () => void;
 }) {
   const [view, setView] = useState<"text" | "photo">(initialView);
   const speechRun = useRef(0);
@@ -136,7 +138,10 @@ export function ReaderView({
       className={`reader-screen ${view === "photo" ? "show-photo" : ""}`}
       aria-label="Reader"
     >
-      <div className="reader-top">
+      <div className="reader-meta">
+        {scan.sample && <span className="sample-label">Sample</span>}
+      </div>
+      <div className="reader-toggle-sticky">
         <div className="segment view-toggle" aria-label="Reader view">
           <button
             type="button"
@@ -155,7 +160,16 @@ export function ReaderView({
             Photo
           </button>
         </div>
-        {scan.sample && <span className="sample-label">Sample</span>}
+        <button
+          type="button"
+          className="icon-button reader-speaker-button"
+          aria-label={speaking ? "Stop reading" : "Read aloud"}
+          title={speaking ? "Stop reading" : "Read aloud"}
+          aria-pressed={speaking}
+          onClick={speak}
+        >
+          <Icon name={speaking ? "stop" : "speaker"} />
+        </button>
       </div>
       {scan.warnings?.some((warning) => warning === "vision_disabled" || warning === "vision_unavailable") && (
         <p className="sample-label" role="status">Second read unavailable; check the original.</p>
@@ -193,16 +207,6 @@ export function ReaderView({
                   );
                 })}
               </div>
-              <button
-                type="button"
-                className="icon-button speaker-button"
-                aria-label={speaking ? "Stop reading" : "Read aloud"}
-                title={speaking ? "Stop reading" : "Read aloud"}
-                aria-pressed={speaking}
-                onClick={speak}
-              >
-                <Icon name={speaking ? "stop" : "speaker"} />
-              </button>
             </article>
             <button
               type="button"
@@ -242,16 +246,6 @@ export function ReaderView({
                 <Icon name="photo" />
               )}
             </button>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label={speaking ? "Stop reading" : "Read aloud"}
-              title={speaking ? "Stop reading" : "Read aloud"}
-              aria-pressed={speaking}
-              onClick={speak}
-            >
-              <Icon name={speaking ? "stop" : "speaker"} />
-            </button>
           </div>
         </>
       ) : (
@@ -259,6 +253,7 @@ export function ReaderView({
           key={scan.id}
           url={scan.photoUrl}
           regions={scan.textRegions}
+          onNewPhoto={onNewPhoto}
         />
       )}
     </section>

@@ -29,6 +29,35 @@ import {
 } from "@/lib/pending-scan";
 
 type Screen = "home" | "processing" | "reader" | "history" | "error";
+type ReaderReturnScreen = "home" | "history";
+const MAX_UPRIGHT_IMAGE_DIMENSION = 2200;
+
+async function prepareUprightImage(file: File) {
+  if (!("createImageBitmap" in window)) return file;
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, MAX_UPRIGHT_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) {
+      bitmap.close();
+      return file;
+    }
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    if (!blob) return file;
+    const baseName = file.name.replace(/\.[^.]+$/, "") || "scan";
+    return new File([blob], `${baseName}.jpg`, {
+      type: "image/jpeg",
+      lastModified: file.lastModified,
+    });
+  } catch {
+    return file;
+  }
+}
 const previewScreens: Record<string, Screen> = {
   reader: "reader",
   photo: "reader",
@@ -48,6 +77,8 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     : "home";
   const isPreview = Object.hasOwn(previewScreens, preview);
   const [screen, setScreen] = useState<Screen>(initial);
+  const [readerReturnScreen, setReaderReturnScreen] =
+    useState<ReaderReturnScreen>("home");
   const [homeReturn, setHomeReturn] = useState(false);
   const [modal, setModal] = useState<"settings" | "login" | "help" | null>(
     preview === "settings" ? "settings" : preview === "login" ? "login" : null,
@@ -60,7 +91,6 @@ export function SidApp({ preview = "" }: { preview?: string }) {
   const [photo, setPhoto] = useState<string>(
     initial === "processing" ? sampleScan.photoUrl : "",
   );
-  const [stage, setStage] = useState("Reading");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
@@ -119,6 +149,11 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       setHomeReturn(true);
       window.setTimeout(() => setHomeReturn(false), 360);
     });
+  };
+  const returnFromReader = () => {
+    setModal(null);
+    setAccountMenu(false);
+    setScreen(readerReturnScreen === "history" && signedIn ? "history" : "home");
   };
 
   useEffect(
@@ -441,18 +476,20 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     }
     stopWork();
     const run = workRun.current;
+    setReaderReturnScreen(screen === "history" ? "history" : "home");
     setModal(null);
     setAccountMenu(false);
     setDragging(false);
     dragDepth.current = 0;
+    setScreen("processing");
+    const preparedFile = await prepareUprightImage(file);
+    if (run !== workRun.current) return;
     if (localPhoto.current) URL.revokeObjectURL(localPhoto.current);
-    const url = URL.createObjectURL(file);
+    const url = URL.createObjectURL(preparedFile);
     localPhoto.current = url;
     setPhoto(url);
     setCurrent(null);
     setProcessingId(null);
-    setScreen("processing");
-    setStage("Reading");
     try {
       const supabase = getSupabase();
       if (!supabase) throw new Error("network");
@@ -466,8 +503,8 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       if (run !== workRun.current) return;
       const documentId = crypto.randomUUID();
       const imagePath = `${ownerId}/${documentId}.jpg`;
-      const { error: uploadError } = await supabase.storage.from("scans").upload(imagePath, file, {
-        contentType: file.type,
+      const { error: uploadError } = await supabase.storage.from("scans").upload(imagePath, preparedFile, {
+        contentType: preparedFile.type,
         upsert: false,
       });
       if (uploadError) throw new Error("network");
@@ -485,8 +522,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       }
       if (run !== workRun.current) return;
       setProcessingId(documentId);
-      timers.current.push(setTimeout(() => setStage("Formatting"), 700));
-      await processDocument(documentId, url, run, file);
+      await processDocument(documentId, url, run, preparedFile);
     } catch (error) {
       if (run !== workRun.current) return;
       setErrorCode(scanErrorCode(error instanceof Error ? error.message : "server"));
@@ -550,12 +586,6 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       window.removeEventListener("paste", paste);
     };
   }, []);
-  useEffect(() => {
-    if (preview !== "processing") return;
-    const timer = setTimeout(() => setStage("Formatting"), 1500);
-    return () => clearTimeout(timer);
-  }, [preview]);
-
   function changeSettings(next: ReaderSettings) {
     if (!saveSettings(next)) setNotice("Settings not saved");
     const supabase = getSupabase();
@@ -628,9 +658,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
       setPhoto(chosen.photoUrl);
       setCurrent(chosen);
       setScreen("processing");
-      setStage("Reading");
       timers.current.push(
-        setTimeout(() => setStage("Formatting"), 700),
         setTimeout(() => {
           setErrorCode("blurry");
           setScreen("error");
@@ -648,8 +676,6 @@ export function SidApp({ preview = "" }: { preview?: string }) {
     setProcessingId(documentId);
     setPhoto(chosen?.photoUrl || photo);
     setScreen("processing");
-    setStage("Reading");
-    timers.current.push(setTimeout(() => setStage("Formatting"), 700));
     void processDocument(documentId, chosen?.photoUrl || photo, run).catch((error) => {
       if (run !== workRun.current) return;
       setErrorCode(scanErrorCode(error instanceof Error ? error.message : "server"));
@@ -702,6 +728,20 @@ export function SidApp({ preview = "" }: { preview?: string }) {
         Skip to content
       </a>
       <header className={`navbar ${signedIn ? "has-account" : ""}`}>
+        <div
+          className={`reader-back-slot ${screen === "reader" ? "is-visible" : ""}`}
+          aria-hidden={screen !== "reader"}
+        >
+          <button
+            type="button"
+            className="reader-back-button"
+            aria-label="Back"
+            tabIndex={screen === "reader" ? 0 : -1}
+            onClick={returnFromReader}
+          >
+            <Icon name="back" />
+          </button>
+        </div>
         <button
           type="button"
           className="wordmark"
@@ -709,7 +749,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           onClick={returnHome}
         >
           <span className="brand-icon" aria-hidden="true">
-            <Icon name="document" />
+            <span className="brand-logo-mark" />
           </span>
           <span className="brand-copy">
             <span className="brand-name">SID</span>
@@ -719,16 +759,6 @@ export function SidApp({ preview = "" }: { preview?: string }) {
           </span>
         </button>
         <nav aria-label="Main navigation">
-          {screen !== "home" && (
-            <button
-              type="button"
-              className="button nav-upload"
-              onClick={() => picker.current?.click()}
-            >
-              <Icon name="upload" />
-              Upload
-            </button>
-          )}
           {signedIn && (
             <button
               type="button"
@@ -860,7 +890,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
               <div className="scan-beam" aria-hidden="true" />
             </div>
             <p role="status" aria-live="polite">
-              {stage}
+              Loading
             </p>
             {isPreview && <span className="sample-label">Sample</span>}
           </section>
@@ -871,6 +901,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             scan={current}
             initialView={preview === "photo" ? "photo" : "text"}
             notify={setNotice}
+            onNewPhoto={() => picker.current?.click()}
           />
         )}
         {screen === "history" && signedIn && (
@@ -881,6 +912,7 @@ export function SidApp({ preview = "" }: { preview?: string }) {
             onUpload={() => picker.current?.click()}
             onOpen={(scan) => {
               setCurrent(scan);
+              setReaderReturnScreen("history");
               if (scan.status === "processing" || scan.status === "queued") {
                 retry(scan);
                 return;
@@ -894,7 +926,10 @@ export function SidApp({ preview = "" }: { preview?: string }) {
               setDeleteError("");
               setDeleting(scan);
             }}
-            onRetry={retry}
+            onRetry={(scan) => {
+              setReaderReturnScreen("history");
+              retry(scan);
+            }}
             onRefresh={() => {
               setHistoryOwner(null);
               setRefresh((n) => n + 1);

@@ -1,27 +1,80 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./ui/icon";
 import { ScanImage } from "./ui/scan-image";
 import { fitPhoto, type TextRegion } from "@/lib/transcription";
 import { useReaderSettings } from "@/lib/settings";
 
-function TextOverlay({ region, font }: { region: TextRegion; font: string }) {
+type OverlayPlacement = {
+  region: TextRegion;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  angle: number;
+};
+
+function overlapArea(first: OverlayPlacement, second: OverlayPlacement) {
+  const left = Math.max(first.left - first.width / 2, second.left - second.width / 2);
+  const top = Math.max(first.top - first.height / 2, second.top - second.height / 2);
+  const right = Math.min(first.left + first.width / 2, second.left + second.width / 2);
+  const bottom = Math.min(first.top + first.height / 2, second.top + second.height / 2);
+  return Math.max(0, right - left) * Math.max(0, bottom - top);
+}
+
+function placeRegions(regions: TextRegion[], width: number, height: number) {
+  const placed = regions.map((region): OverlayPlacement => {
+    if (region.quad?.length === 4 && width && height) {
+      const points = region.quad.map(([x, y]) => ({ x: (x / 1000) * width, y: (y / 1000) * height }));
+      const center = points.reduce((sum, point) => ({ x: sum.x + point.x / 4, y: sum.y + point.y / 4 }), { x: 0, y: 0 });
+      const edgeWidth = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+      const edgeHeight = Math.hypot(points[2].x - points[1].x, points[2].y - points[1].y);
+      return {
+        region,
+        left: (center.x / width) * 100,
+        top: (center.y / height) * 100,
+        width: (edgeWidth / width) * 100,
+        height: (edgeHeight / height) * 100,
+        angle: (Math.atan2(points[1].y - points[0].y, points[1].x - points[0].x) * 180) / Math.PI,
+      };
+    }
+    const [top, left, bottom, right] = region.box_2d;
+    return { region, left: (left + right) / 20, top: (top + bottom) / 20, width: (right - left) / 10, height: (bottom - top) / 10, angle: 0 };
+  });
+  return placed.reduce<OverlayPlacement[]>((resolved, placement) => {
+    const previous = resolved.find((candidate) => {
+      const intersection = overlapArea(candidate, placement);
+      return intersection > 0.15 * Math.min(candidate.width * candidate.height, placement.width * placement.height);
+    });
+    if (!previous) return [...resolved, placement];
+    const previousBottom = previous.top + previous.height / 2;
+    const placementBottom = placement.top + placement.height / 2;
+    const heightAfterOverlap = placementBottom - previousBottom;
+    if (heightAfterOverlap <= 0.5) return resolved;
+    return [...resolved, {
+      ...placement,
+      top: previousBottom + heightAfterOverlap / 2,
+      height: heightAfterOverlap,
+    }];
+  }, []);
+}
+
+function TextOverlay({ placement, font }: { placement: OverlayPlacement; font: string }) {
   const box = useRef<HTMLDivElement>(null);
   const text = useRef<HTMLSpanElement>(null);
   useEffect(() => {
-    const element = box.current, content = text.current;
+    const element = box.current;
+    const content = text.current;
     if (!element || !content) return;
-    let active = true;
     const fit = () => {
-      if (!active || !element.clientWidth || !element.clientHeight) return;
-      // Measure real DOM glyphs after the chosen font loads. Never crop or
-      // shorten transcription to make it fit a box.
-      let low = 0.5, high = element.clientHeight;
-      for (let i = 0; i < 14; i++) {
+      if (!element.clientWidth || !element.clientHeight) return;
+      let low = 1;
+      let high = Math.max(1, element.clientHeight);
+      for (let index = 0; index < 14; index += 1) {
         const size = (low + high) / 2;
         content.style.fontSize = `${size}px`;
-        if (content.offsetWidth <= element.clientWidth - 2 && content.offsetHeight <= element.clientHeight - 1) low = size;
+        if (content.scrollWidth <= element.clientWidth && content.scrollHeight <= element.clientHeight) low = size;
         else high = size;
       }
       content.style.fontSize = `${low}px`;
@@ -30,12 +83,14 @@ function TextOverlay({ region, font }: { region: TextRegion; font: string }) {
     observer.observe(element);
     void document.fonts.ready.then(fit);
     document.fonts.addEventListener("loadingdone", fit);
-    return () => { active = false; observer.disconnect(); document.fonts.removeEventListener("loadingdone", fit); };
-  }, [region.text, font]);
-  const [top, left, bottom, right] = region.box_2d;
+    return () => {
+      observer.disconnect();
+      document.fonts.removeEventListener("loadingdone", fit);
+    };
+  }, [placement.region.text, font]);
   return (
-    <div ref={box} className="photo-text-region" style={{ left: `${left / 10}%`, top: `${top / 10}%`, width: `${(right - left) / 10}%`, height: `${(bottom - top) / 10}%`, fontFamily: font }}>
-      <span ref={text}>{region.text}</span>
+    <div ref={box} className="photo-text-region" style={{ left: `${placement.left}%`, top: `${placement.top}%`, width: `${placement.width}%`, height: `${placement.height}%`, transform: `translate(-50%, -50%) rotate(${placement.angle}deg)`, fontFamily: font }}>
+      <span ref={text}>{placement.region.text}</span>
     </div>
   );
 }
@@ -43,9 +98,11 @@ function TextOverlay({ region, font }: { region: TextRegion; font: string }) {
 export function PhotoView({
   url,
   regions = [],
+  onNewPhoto,
 }: {
   url: string;
   regions?: TextRegion[];
+  onNewPhoto?: () => void;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -55,6 +112,12 @@ export function PhotoView({
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
   const settings = useReaderSettings();
   const fitted = fitPhoto(imageSize, frameSize);
+  const placements = useMemo(
+    () => placeRegions(regions, fitted?.width ?? 0, fitted?.height ?? 0),
+    [regions, fitted?.width, fitted?.height],
+  );
+  const photoIsTilted = placements.length > 0 &&
+    placements.filter((placement) => Math.abs(placement.angle) > 30).length > placements.length / 2;
   const zoom = (factor: number) =>
     setTransform((t) => ({
       ...t,
@@ -153,11 +216,23 @@ export function PhotoView({
             onLoad={(event) => setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} />
           {!!regions.length && !original && fitted && (
             <div className="photo-text-overlays" aria-label="Original text in a readable font">
-              {regions.map((region, index) => <TextOverlay key={index} region={region} font={settings.font} />)}
+              {placements.map((placement, index) => (
+                <TextOverlay
+                  key={index}
+                  placement={placement}
+                  font={settings.font}
+                />
+              ))}
             </div>
           )}
         </div>
       </div>
+      {photoIsTilted && (
+        <div className="tilted-photo-banner" role="status">
+          <span>Photo is tilted. Retake for best results</span>
+          {onNewPhoto && <button type="button" onClick={onNewPhoto}>New photo</button>}
+        </div>
+      )}
       <div className="photo-toolbar">
         {regions.length ? (
           <div className="segment original-toggle">

@@ -19,7 +19,8 @@ export type IconName =
   | "plus"
   | "logout"
   | "mail"
-  | "book";
+  | "book"
+  | "back";
 const paths: Record<IconName, React.ReactNode> = {
   document: (
     <>
@@ -96,6 +97,7 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v17H6.5A2.5 2.5 0 0 0 4 22zM20 5.5A2.5 2.5 0 0 0 17.5 3H13v17h4.5A2.5 2.5 0 0 1 20 22z" />
     </>
   ),
+  back: <path d="m14 5-7 7 7 7" />,
 };
 export function Icon({
   name,
