@@ -62,7 +62,6 @@ export function Dialog({
       }}
     >
       <div className="dialog-content">
-        <div className="sheet-handle" aria-hidden="true" />
         <button
           type="button"
           className="icon-button dialog-close"
